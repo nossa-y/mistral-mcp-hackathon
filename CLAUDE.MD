@@ -476,19 +476,18 @@ coldopen-coach/
 
 ### Current MCP Tools Available
 
-#### mcp_x server (Twitter/X)
-- `get_recent_posts` - Fetch recent posts from X/Twitter using Apify
+#### social_mcp_server (Consolidated Social Media Server)
+- `get_x_posts` - Fetch recent posts from X/Twitter using Apify
   - **Input**: `handle` (string, without @), `limit` (int, default: 20)
   - **Output**: JSON Bundle with normalized Person, Posts, and Meta data
   - **Features**: Extracts hashtags, mentions, engagement metrics, applies theme inference
 
-#### mcp_linkedin server (LinkedIn)
-- `get_recent_posts` - Fetch recent posts from LinkedIn using Apify
+- `get_linkedin_posts` - Fetch recent posts from LinkedIn using Apify
   - **Input**: `profile_url` (LinkedIn profile URL), `limit` (int, default: 10)
   - **Output**: JSON Bundle with normalized Person, Posts, and Meta data
   - **Features**: URL parsing, hashtag/mention extraction, engagement metrics, theme inference
 
-**Note**: The coaching server has been removed. Le Chat now handles conversation coaching using the clean data provided by these data fetching servers.
+**Note**: Both tools are now consolidated into a single MCP server for easier Le Chat integration. The coaching server has been removed and Le Chat handles conversation coaching using the clean data provided.
 
 ### Environment Configuration
 ```env
@@ -512,9 +511,8 @@ DEFAULT_POST_LIMIT_LINKEDIN=10
 # Install dependencies (using uv - modern Python package manager)
 uv sync
 
-# Run individual servers
-uv run python -m mcp_servers.mcp_x.server
-uv run python -m mcp_servers.mcp_linkedin.server
+# Run the consolidated social MCP server
+uv run python -m social_mcp_server.server
 
 # Or run demo to see expected input/output
 python demo_usage.py
@@ -529,21 +527,16 @@ python test_nossa_direct.py
 ```json
 {
   "mcpServers": {
-    "coldopen-x": {
+    "social-mcp": {
       "command": "uv",
-      "args": ["run", "python", "-m", "mcp_servers.mcp_x.server"],
-      "cwd": "/path/to/mistral-mcp-hackathon/coldopen-coach"
-    },
-    "coldopen-linkedin": {
-      "command": "uv",
-      "args": ["run", "python", "-m", "mcp_servers.mcp_linkedin.server"],
-      "cwd": "/path/to/mistral-mcp-hackathon/coldopen-coach"
+      "args": ["run", "python", "-m", "social_mcp_server.server"],
+      "cwd": "/path/to/mistral-mcp-hackathon"
     }
   }
 }
 ```
 
-**Note**: The approach coach server has been removed. Only the two data fetching servers remain.
+**Note**: The separate X and LinkedIn servers have been consolidated into a single social MCP server with both `get_x_posts` and `get_linkedin_posts` tools.
 
 ## Recent Updates (Updated: 2025-09-13)
 

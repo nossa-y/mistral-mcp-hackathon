@@ -59,11 +59,8 @@ APIFY_LINKEDIN_POSTS_ACTOR=your_linkedin_posts_actor
 ### 3. Run MCP Servers
 
 ```bash
-# X/Twitter server
-python mcp_servers/mcp_x/server.py
-
-# LinkedIn server
-python mcp_servers/mcp_linkedin/server.py
+# Consolidated Social MCP server (includes both X and LinkedIn tools)
+python social_mcp_server/server.py
 ```
 
 ### 4. Test Data Fetching
@@ -204,13 +201,8 @@ coldopen-coach/
 ├── shared/
 │   ├── models.py            # Clean data models for Le Chat
 │   └── theme_inference.py   # Theme detection engine
-├── mcp_servers/             # 2 focused MCP servers
-│   ├── mcp_x/
-│   │   └── server.py        # X/Twitter MCP server
-│   └── mcp_linkedin/
-│       └── server.py        # LinkedIn MCP server
-├── demo/
-│   └── fetch_data.py        # Test data fetching
+├── social_mcp_server/       # Consolidated social media MCP server
+│   └── server.py            # Combined X/Twitter and LinkedIn MCP server
 └── README.md               # This file
 ```
 
@@ -240,8 +232,8 @@ and help me find common ground for a respectful introduction at this startup eve
 
 ### Adding New Platforms
 
-1. Create new MCP server in `mcp_servers/mcp_[platform]/`
-2. Implement `[platform].get_recent_posts` tool
+1. Add new tool to `social_mcp_server/server.py`
+2. Implement `get_[platform]_posts` tool following existing patterns
 3. Use the same Bundle/Post/Person data structure
 4. Add platform to Platform enum in shared/models.py
 

@@ -9,15 +9,15 @@ import asyncio
 from typing import Dict, Any, Optional
 import logging
 
-# Import your MCP servers
-from mcp_servers.mcp_x.server import app as x_app
-from mcp_servers.mcp_linkedin.server import app as linkedin_app
+# Import the consolidated MCP server
+from social_mcp_server.server import app as social_app
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Server mapping based on environment variable
+# Single consolidated server
+SERVER_APP = social_app
 SERVERS = {
     'x': x_app,
     'linkedin': linkedin_app,
@@ -91,16 +91,5 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """AWS Lambda handler entry point."""
     return asyncio.run(handle_mcp_request(event, context))
 
-# For backwards compatibility, create specific handlers for each server
-def x_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
-    """Handler specifically for X/Twitter MCP server."""
-    os.environ['MCP_SERVER_TYPE'] = 'x'
-    return lambda_handler(event, context)
-
-def linkedin_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
-    """Handler specifically for LinkedIn MCP server."""
-    os.environ['MCP_SERVER_TYPE'] = 'linkedin'
-    return lambda_handler(event, context)
-
-# Default handler
+# Default handler for the consolidated social MCP server
 handler = lambda_handler

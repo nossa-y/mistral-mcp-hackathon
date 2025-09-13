@@ -30,11 +30,9 @@ COPY --from=builder ${LAMBDA_TASK_ROOT} ${LAMBDA_TASK_ROOT}
 
 # Copy application code
 # These paths are relative to the build context (repository root)
-COPY mcp_servers/ ${LAMBDA_TASK_ROOT}/mcp_servers/
+COPY social_mcp_server/ ${LAMBDA_TASK_ROOT}/social_mcp_server/
 COPY shared/ ${LAMBDA_TASK_ROOT}/shared/
 COPY lambda_handler.py ${LAMBDA_TASK_ROOT}/
 
-# Set the Lambda handler
-# This will need to be customized based on which MCP server you're deploying
-# Available handlers: lambda_handler.x_handler, lambda_handler.linkedin_handler
-CMD ["lambda_handler.lambda_handler"]
+# Set the Lambda handler for the consolidated social MCP server
+CMD ["lambda_handler.handler"]

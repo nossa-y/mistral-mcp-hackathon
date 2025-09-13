@@ -74,8 +74,8 @@ phases:
           echo "ERROR: Dockerfile not found at $CODEBUILD_SRC_DIR_DOCKERFILES/$RUNTIME"
           exit 1
         fi
-        if [ ! -d "$SRC_DIR/mcp_servers" ]; then
-          echo "ERROR: mcp_servers directory not found at $SRC_DIR/mcp_servers"
+        if [ ! -d "$SRC_DIR/social_mcp_server" ]; then
+          echo "ERROR: social_mcp_server directory not found at $SRC_DIR/social_mcp_server"
           exit 1
         fi
         if [ ! -d "$SRC_DIR/shared" ]; then
