@@ -155,30 +155,18 @@ def normalize_linkedin_post(item: Dict[str, Any], profile_url: str) -> Post:
         inferred_themes=[]
     )
 
-
 @mcp.tool()
-def get_x_posts(handle: str, limit: int = 20) -> str:
-    """
-    Fetch recent posts from X/Twitter using Apify.
-
-    Args:
-        handle: Twitter handle (without @)
-        limit: Maximum number of posts to fetch (default: 20)
-
-    Returns:
-        JSON string with the Bundle containing person info, posts, and metadata
-    """
+def get_x_posts(handle: str, limit: int = 20) -> Dict[str, Any]:
+    """Fetch recent posts from X/Twitter using Apify."""
     handle = handle.strip().replace("@", "")
 
     if not handle:
-        return f"Error: {ErrorType.INVALID_INPUT} - Handle is required"
+        raise ValueError("Handle is required")
 
     try:
-        # Get Apify configuration
         client = get_apify_client()
         actor_id = os.getenv("APIFY_TWITTER_ACTOR", "apidojo/tweet-scraper")
 
-        # Prepare actor input
         actor_input = {
             "handles": [handle],
             "tweetsPerQuery": limit,
@@ -186,14 +174,11 @@ def get_x_posts(handle: str, limit: int = 20) -> str:
             "includeRetweets": False
         }
 
-        # Run the actor
         run = client.actor(actor_id).call(run_input=actor_input)
-
-        # Get the dataset items
         items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
 
         if not items:
-            return f"Error: {ErrorType.NOT_FOUND} - No recent posts found for @{handle}"
+            raise ValueError(f"No recent posts found for @{handle}")
 
         # Convert to normalized format
         posts = []
@@ -202,11 +187,10 @@ def get_x_posts(handle: str, limit: int = 20) -> str:
                 post = normalize_x_post(item, handle)
                 posts.append(post)
             except Exception as e:
-                print(f"Warning: Failed to normalize post: {e}")
                 continue
 
         if not posts:
-            return f"Error: {ErrorType.SCHEMA_MISMATCH} - Could not parse any posts"
+            raise ValueError("Could not parse any posts")
 
         # Apply theme inference
         ThemeInferenceEngine.infer_themes_bulk(posts)
@@ -235,64 +219,39 @@ def get_x_posts(handle: str, limit: int = 20) -> str:
             meta=meta
         )
 
-        return bundle.model_dump_json(indent=2)
+        # Return dict, not JSON string
+        return bundle.model_dump()  # ✅ This is the key fix!
 
     except Exception as e:
-        error_msg = str(e)
-
-        # Classify the error
-        if "rate limit" in error_msg.lower():
-            error_type = ErrorType.RATE_LIMITED
-        elif "private" in error_msg.lower() or "protected" in error_msg.lower():
-            error_type = ErrorType.PRIVATE_PROFILE
-        elif "not found" in error_msg.lower():
-            error_type = ErrorType.NOT_FOUND
-        else:
-            error_type = ErrorType.API_ERROR
-
-        return f"Error: {error_type} - {error_msg}"
+        raise ValueError(f"Failed to fetch X posts: {str(e)}")
 
 
 @mcp.tool()
-def get_linkedin_posts(profile_url: str, limit: int = 10) -> str:
-    """
-    Fetch recent posts from LinkedIn using Apify.
-
-    Args:
-        profile_url: LinkedIn profile URL (e.g., https://linkedin.com/in/username)
-        limit: Maximum number of posts to fetch (default: 10)
-
-    Returns:
-        JSON string with the Bundle containing person info, posts, and metadata
-    """
+def get_linkedin_posts(profile_url: str, limit: int = 10) -> Dict[str, Any]:
+    """Fetch recent posts from LinkedIn using Apify."""
     if not profile_url.strip():
-        return f"Error: {ErrorType.INVALID_INPUT} - Profile URL is required"
+        raise ValueError("Profile URL is required")
 
     try:
         username = extract_linkedin_username(profile_url)
     except ValueError as e:
-        return f"Error: {ErrorType.INVALID_INPUT} - {e}"
+        raise ValueError(str(e))
 
     try:
-        # Get Apify configuration
         client = get_apify_client()
         actor_id = os.getenv("APIFY_LINKEDIN_POSTS_ACTOR", "your_linkedin_posts_actor")
 
-        # Prepare actor input
         actor_input = {
             "profiles": [profile_url],
             "postsPerProfile": limit,
             "includeComments": False
         }
 
-        # Run the actor
         run = client.actor(actor_id).call(run_input=actor_input)
-
-        # Get the dataset items
         items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
 
         if not items:
-            return f"Error: {ErrorType.NOT_FOUND} - No recent posts found for profile"
+            raise ValueError("No recent posts found for profile")
 
         # Convert to normalized format
         posts = []
@@ -301,11 +260,10 @@ def get_linkedin_posts(profile_url: str, limit: int = 10) -> str:
                 post = normalize_linkedin_post(item, profile_url)
                 posts.append(post)
             except Exception as e:
-                print(f"Warning: Failed to normalize post: {e}")
                 continue
 
         if not posts:
-            return f"Error: {ErrorType.SCHEMA_MISMATCH} - Could not parse any posts"
+            raise ValueError("Could not parse any posts")
 
         # Apply theme inference
         ThemeInferenceEngine.infer_themes_bulk(posts)
@@ -333,24 +291,11 @@ def get_linkedin_posts(profile_url: str, limit: int = 10) -> str:
             meta=meta
         )
 
-        return bundle.model_dump_json(indent=2)
+        # Return dict, not JSON string  
+        return bundle.model_dump()  # ✅ This is the key fix!
 
     except Exception as e:
-        error_msg = str(e)
-
-        # Classify the error
-        if "rate limit" in error_msg.lower():
-            error_type = ErrorType.RATE_LIMITED
-        elif "private" in error_msg.lower() or "protected" in error_msg.lower():
-            error_type = ErrorType.PRIVATE_PROFILE
-        elif "not found" in error_msg.lower():
-            error_type = ErrorType.NOT_FOUND
-        else:
-            error_type = ErrorType.API_ERROR
-
-        return f"Error: {error_type} - {error_msg}"
-
-
+        raise ValueError(f"Failed to fetch LinkedIn posts: {str(e)}")
 # Export the FastMCP instance for Lambda usage
 app = mcp
 
@@ -361,4 +306,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    if os.getenv("HTTP_MODE"):
+        mcp.run_http(port=int(os.getenv("PORT", 8080)))
+    else:
+        mcp.run()  # STDIO for local testing

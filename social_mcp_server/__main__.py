@@ -1,5 +1,3 @@
-"""Entry point for social_mcp_server module"""
-from .server import mcp
-
+from .server import main
 if __name__ == "__main__":
-    mcp.run()
+    main()
