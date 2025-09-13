@@ -2,13 +2,14 @@
 
 ## Current Implementation Status (Python)
 
-This project currently consists of **separate Python MCP servers** for the Mistral MCP Hackathon:
+This project currently consists of **two Python MCP servers** for the Mistral MCP Hackathon:
 
 - **mcp_x** - Twitter/X integration via Apify
-- **mcp_linkedin** - LinkedIn integration (optional)
-- **mcp_approach_coach** - Cold outreach coaching logic
+- **mcp_linkedin** - LinkedIn integration via Apify
 
-Each server runs independently using stdio transport and can be configured in MCP clients like Claude Desktop or Le Chat.
+Each server runs independently using stdio transport with FastMCP and can be configured in MCP clients like Claude Desktop or Le Chat.
+
+**Note**: The project was recently simplified to focus on clean data fetching. The coaching logic has been removed in favor of letting Le Chat handle conversation coaching directly using the normalized data.
 
 ## Future HTTP Specification (Node.js/TypeScript)
 
@@ -459,51 +460,70 @@ End of HTTP Spec — For Future Implementation
 coldopen-coach/
 ├── mcp_servers/
 │   ├── mcp_x/
-│   │   └── server.py          # Twitter/X MCP server
-│   ├── mcp_linkedin/
-│   │   └── server.py          # LinkedIn MCP server
-│   └── mcp_approach_coach/
-│       └── server.py          # Coaching MCP server
+│   │   └── server.py          # Twitter/X MCP server (FastMCP)
+│   └── mcp_linkedin/
+│       └── server.py          # LinkedIn MCP server (FastMCP)
 ├── shared/
-│   ├── models.py              # Normalized data models
-│   └── theme_inference.py     # Theme analysis
+│   ├── models.py              # Normalized data models (Pydantic)
+│   └── theme_inference.py     # Theme analysis utilities
 ├── demo/
 │   └── fetch_data.py          # Demo scripts
-└── requirements.txt           # Python dependencies
+├── demo_usage.py              # Usage examples and expected I/O
+├── pyproject.toml             # Modern Python project configuration
+├── requirements.txt           # Python dependencies
+└── uv.lock                    # Dependency lock file
 ```
 
 ### Current MCP Tools Available
 
 #### mcp_x server (Twitter/X)
-- `fetch_recent_posts` - Get recent posts from X/Twitter user
-- `search_posts` - Search posts by keywords/hashtags
+- `get_recent_posts` - Fetch recent posts from X/Twitter using Apify
+  - **Input**: `handle` (string, without @), `limit` (int, default: 20)
+  - **Output**: JSON Bundle with normalized Person, Posts, and Meta data
+  - **Features**: Extracts hashtags, mentions, engagement metrics, applies theme inference
 
 #### mcp_linkedin server (LinkedIn)
-- `get_person_profile` - Get LinkedIn profile information
-- `get_recent_activity` - Fetch recent LinkedIn activity
+- `get_recent_posts` - Fetch recent posts from LinkedIn using Apify
+  - **Input**: `profile_url` (LinkedIn profile URL), `limit` (int, default: 10)
+  - **Output**: JSON Bundle with normalized Person, Posts, and Meta data
+  - **Features**: URL parsing, hashtag/mention extraction, engagement metrics, theme inference
 
-#### mcp_approach_coach server (Coaching)
-- `analyze_social_context` - Analyze posts for conversation starters
-- `generate_openers` - Create personalized outreach messages
-- `suggest_themes` - Identify common themes and interests
+**Note**: The coaching server has been removed. Le Chat now handles conversation coaching using the clean data provided by these data fetching servers.
 
 ### Environment Configuration
 ```env
+# Required: Your Apify API token
 APIFY_TOKEN=your_apify_token_here
-LINKEDIN_COOKIE=li_at=your_linkedin_cookie_here  # Optional
-DEBUG=true
+
+# Optional: Override default Apify actors
+APIFY_TWITTER_ACTOR=apidojo/tweet-scraper
+APIFY_LINKEDIN_POSTS_ACTOR=your_linkedin_posts_actor
+
+# Optional: Default settings
+DEFAULT_FRESHNESS_DAYS=30
+DEFAULT_POST_LIMIT_X=20
+DEFAULT_POST_LIMIT_LINKEDIN=10
 ```
+
+**Note**: LinkedIn cookie authentication has been simplified to use Apify actors instead.
 
 ### Running Current Implementation
 ```bash
-# Install dependencies
+# Install dependencies (using uv - modern Python package manager)
 uv sync
 
 # Run individual servers
 uv run python -m mcp_servers.mcp_x.server
 uv run python -m mcp_servers.mcp_linkedin.server
-uv run python -m mcp_servers.mcp_approach_coach.server
+
+# Or run demo to see expected input/output
+python demo_usage.py
+
+# Test direct server calls (without MCP client)
+python test_nossa_direct.py
 ```
+
+**Dependencies**: The project now uses `fastmcp>=0.9.0`, `pydantic>=2.0.0`, and `apify-client>=1.7.0`.
 
 ### MCP Client Configuration (Claude Desktop)
 ```json
@@ -518,13 +538,43 @@ uv run python -m mcp_servers.mcp_approach_coach.server
       "command": "uv",
       "args": ["run", "python", "-m", "mcp_servers.mcp_linkedin.server"],
       "cwd": "/path/to/mistral-mcp-hackathon/coldopen-coach"
-    },
-    "coldopen-coach": {
-      "command": "uv",
-      "args": ["run", "python", "-m", "mcp_servers.mcp_approach_coach.server"],
-      "cwd": "/path/to/mistral-mcp-hackathon/coldopen-coach"
     }
   }
 }
 ```
+
+**Note**: The approach coach server has been removed. Only the two data fetching servers remain.
+
+## Recent Updates (Updated: 2025-09-13)
+
+### Major Refactoring (Commit f57c1da)
+- **Simplified Architecture**: Removed the `mcp_approach_coach` server and orchestrator logic
+- **Focus Shift**: Changed from coaching logic to clean data fetching, letting Le Chat handle conversation coaching
+- **Removed Files**: `main.py`, coaching server, and demo scripts that relied on the orchestrator
+- **Added Files**: `demo_usage.py` for clear usage examples, `test_nossa_direct.py` for testing
+
+### Technical Changes
+- **Framework**: Migrated to FastMCP for cleaner server implementation
+- **Dependencies**: Updated to use modern Python tooling (`uv`, `pyproject.toml`)
+- **Data Models**: Refined Pydantic models for better Le Chat integration
+- **Error Handling**: Improved error classification and handling in both servers
+- **Theme Inference**: Maintained theme analysis capabilities in shared utilities
+
+### Current Status
+- ✅ **mcp_x server**: Fully functional, tested with Apify Tweet Scraper
+- ✅ **mcp_linkedin server**: Implemented with Apify integration (requires LinkedIn actor)
+- ❌ **mcp_approach_coach server**: Removed in favor of Le Chat handling coaching
+- ✅ **Normalized Data Models**: Clean Pydantic models with proper JSON serialization
+- ✅ **Demo Scripts**: Working examples showing expected input/output
+
+### Breaking Changes
+- Removed all coaching-related tools (`analyze_social_context`, `generate_openers`, `suggest_themes`)
+- Changed environment variable requirements (removed `LINKEDIN_COOKIE`, added Apify actor configs)
+- Simplified MCP client configuration (only 2 servers instead of 3)
+
+## Important Notes
+- Set `APIFY_TOKEN` environment variable before running servers
+- The project focuses on clean data extraction; Le Chat provides conversation coaching
+- Both servers return normalized `Bundle` objects with `Person`, `Posts[]`, and `Meta` data
+- Theme inference is applied automatically to all fetched posts
 
