@@ -30,17 +30,16 @@ def test_nossa_twitter():
         print("🚀 Starting Twitter scraper...")
 
         run_input = {
-            "handles": ["elonmusk"],  # Well-known active handle to test
-            "tweetsDesired": 5,       # Number of tweets
-            "includeReplies": False,
-            "includeRetweets": False
+            "searchTerms": ["from:Nossa_ym"],  # Modern format using search terms
+            "sort": "Latest",
+            "tweetLanguage": "en"
         }
 
         print(f"📊 Input parameters: {json.dumps(run_input, indent=2)}")
 
-        # Run the actor synchronously
+        # Run the actor synchronously using the modern Twitter scraper
         print("⏳ Running Apify actor (this may take 30-60 seconds)...")
-        run = client.actor("61RPP7dywgiy0JPD0").call(run_input=run_input)
+        run = client.actor("apidojo/tweet-scraper").call(run_input=run_input)
 
         # Fetch the results
         print("📥 Fetching results...")
