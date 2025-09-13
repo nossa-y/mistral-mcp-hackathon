@@ -113,22 +113,22 @@ def extract_linkedin_username(profile_url: str) -> str:
 
 def normalize_linkedin_post(item: Dict[str, Any], profile_url: str) -> Post:
     """Convert Apify LinkedIn actor response item to normalized Post."""
-    post_id = str(item.get("postId", item.get("id", "")))
-    post_url = item.get("postUrl", item.get("url", ""))
-    text = item.get("text", item.get("content", ""))
-    created_at = item.get("postedAt", item.get("publishedAt", item.get("createdAt", "")))
+    # Extract from new supreme_coder/linkedin-post format
+    post_id = str(item.get("urn", "")).split(":")[-1] if item.get("urn") else ""
+    post_url = item.get("url", "")
+    text = item.get("text", "")
 
-    # Handle date format
-    if created_at:
+    # Handle timestamp - new actor provides postedAtISO and postedAtTimestamp
+    created_at = item.get("postedAtISO", "")
+    if not created_at and item.get("postedAtTimestamp"):
+        # Convert timestamp to ISO format
         try:
-            if isinstance(created_at, str):
-                if not created_at.endswith('Z') and '+' not in created_at:
-                    created_at = created_at + 'Z'
-                dt = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
-                created_at = dt.isoformat()
-        except ValueError:
+            ts = item.get("postedAtTimestamp") / 1000  # Convert ms to seconds
+            dt = datetime.fromtimestamp(ts, timezone.utc)
+            created_at = dt.isoformat()
+        except (ValueError, TypeError):
             created_at = datetime.now(timezone.utc).isoformat()
-    else:
+    elif not created_at:
         created_at = datetime.now(timezone.utc).isoformat()
 
     # Extract hashtags and mentions
@@ -140,11 +140,11 @@ def normalize_linkedin_post(item: Dict[str, Any], profile_url: str) -> Post:
         mention_matches = re.findall(r'@(\w+)', text)
         mentions = mention_matches
 
-    # Extract engagement metrics
+    # Extract engagement metrics from new format
     engagement = {
-        "likes": item.get("likesCount", item.get("reactions", 0)),
-        "comments": item.get("commentsCount", 0),
-        "shares": item.get("sharesCount", item.get("reposts", 0))
+        "likes": item.get("numLikes", 0),
+        "comments": item.get("numComments", 0),
+        "shares": item.get("numShares", 0)
     }
 
     return Post(
@@ -172,8 +172,8 @@ def get_x_posts(handle: str, limit: int = 20) -> Dict[str, Any]:
         actor_id = os.getenv("APIFY_TWITTER_ACTOR", "apidojo/tweet-scraper")
 
         actor_input = {
-            "handles": [handle],
-            "tweetsPerQuery": limit,
+            "searchTerms": [f"from:{handle}"],
+            "maxTweets": limit,
             "includeReplies": False,
             "includeRetweets": False
         }
@@ -243,12 +243,11 @@ def get_linkedin_posts(profile_url: str, limit: int = 10) -> Dict[str, Any]:
 
     try:
         client = get_apify_client()
-        actor_id = os.getenv("APIFY_LINKEDIN_POSTS_ACTOR", "your_linkedin_posts_actor")
+        actor_id = os.getenv("APIFY_LINKEDIN_POSTS_ACTOR", "supreme_coder/linkedin-post")
 
         actor_input = {
-            "profiles": [profile_url],
-            "postsPerProfile": limit,
-            "includeComments": False
+            "urls": [profile_url],
+            "limitPerSource": limit
         }
 
         run = client.actor(actor_id).call(run_input=actor_input)
