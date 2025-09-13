@@ -12,13 +12,17 @@ def create_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  social-mcp-server                    # Start server with default settings
-  social-mcp-server --debug            # Start with debug logging
+  social-mcp-server                    # Start server in stdio mode (default)
+  social-mcp-server --http             # Start HTTP server on localhost:8000
+  social-mcp-server --http --port 9000 # Start HTTP server on port 9000
+  social-mcp-server --debug --http     # Start HTTP server with debug logging
 
 Environment Variables:
   APIFY_TOKEN                          # Required: Your Apify API token
   APIFY_TWITTER_ACTOR                  # Optional: Custom Twitter actor ID
   APIFY_LINKEDIN_POSTS_ACTOR           # Optional: Custom LinkedIn actor ID
+  SERVER_TOKEN                         # Optional: Bearer token for HTTP auth
+  ALLOWED_ORIGINS                      # Optional: CORS origins (default: chat.mistral.ai)
         """,
     )
 
@@ -26,6 +30,25 @@ Environment Variables:
         "--debug",
         action="store_true",
         help="Enable debug logging",
+    )
+
+    parser.add_argument(
+        "--http",
+        action="store_true",
+        help="Run in HTTP mode (default: stdio)",
+    )
+
+    parser.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="HTTP server host (default: 127.0.0.1)",
+    )
+
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8000,
+        help="HTTP server port (default: 8000)",
     )
 
     parser.add_argument(

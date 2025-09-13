@@ -1,0 +1,60 @@
+2025-09-13 19:08:31,340 - social_mcp_server.http_server - INFO - Creating HTTP Social MCP Server...
+2025-09-13 19:08:31,341 - social_mcp_server.http_server - INFO - Registering X/Twitter tools...
+2025-09-13 19:08:31,341 - social_mcp_server.http_server - INFO - Registering LinkedIn tools...
+2025-09-13 19:08:31,341 - social_mcp_server.http_server - INFO - HTTP Social MCP Server created successfully
+2025-09-13 19:08:31,341 - social_mcp_server.http_server - INFO - Server will run on 127.0.0.1:8003
+2025-09-13 19:08:31,341 - social_mcp_server.http_server - INFO - MCP endpoint: http://127.0.0.1:8003/mcp
+2025-09-13 19:08:31,341 - social_mcp_server.http_server - INFO - Health check: http://127.0.0.1:8003/health
+2025-09-13 19:08:31,341 - social_mcp_server.http_server - INFO - Starting HTTP MCP server...
+2025-09-13 19:08:31,341 - social_mcp_server.http_server - INFO - Authentication: Disabled
+2025-09-13 19:08:31,341 - social_mcp_server.http_server - INFO - Allowed origins: https://chat.mistral.ai
+
+
+╭────────────────────────────────────────────────────────────────────────────╮
+│                                                                            │
+│        _ __ ___  _____           __  __  _____________    ____    ____     │
+│       _ __ ___ .'____/___ ______/ /_/  |/  / ____/ __ \  |___ \  / __ \    │
+│      _ __ ___ / /_  / __ `/ ___/ __/ /|_/ / /   / /_/ /  ___/ / / / / /    │
+│     _ __ ___ / __/ / /_/ (__  ) /_/ /  / / /___/ ____/  /  __/_/ /_/ /     │
+│    _ __ ___ /_/    \____/____/\__/_/  /_/\____/_/      /_____(*)____/      │
+│                                                                            │
+│                                                                            │
+│                                FastMCP  2.0                                │
+│                                                                            │
+│                                                                            │
+│               🖥️  Server name:     Social MCP Server                        │
+│               📦 Transport:       Streamable-HTTP                          │
+│               🔗 Server URL:      http://127.0.0.1:8003/mcp                │
+│                                                                            │
+│               🏎️  FastMCP version: 2.12.3                                   │
+│               🤝 MCP SDK version: 1.14.0                                   │
+│                                                                            │
+│               📚 Docs:            https://gofastmcp.com                    │
+│               🚀 Deploy:          https://fastmcp.cloud                    │
+│                                                                            │
+╰────────────────────────────────────────────────────────────────────────────╯
+
+
+[09/13/25 19:08:31] INFO     Starting MCP server 'Social MCP      server.py:1572
+                             Server' with transport                             
+                             'streamable-http' on                               
+                             http://127.0.0.1:8003/mcp                          
+INFO:     Started server process [86356]
+INFO:     Waiting for application startup.
+2025-09-13 19:08:31,350 - mcp.server.streamable_http_manager - INFO - StreamableHTTP session manager started
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8003 (Press CTRL+C to quit)
+2025-09-13 19:09:15,203 - mcp.server.streamable_http_manager - INFO - Created new transport with session ID: bb23b24178b1443685f529fd70be1c58
+Error: Missing required environment variables: APIFY_TOKEN
+Please set these variables before starting the server.
+Warning: Server will return errors for API calls without proper environment setup
+Starting HTTP MCP server on 127.0.0.1:8003
+MCP endpoint: http://127.0.0.1:8003/mcp
+Authentication: Disabled (set SERVER_TOKEN to enable)
+INFO:     127.0.0.1:57377 - "POST /mcp HTTP/1.1" 406 Not Acceptable
+INFO:     Shutting down
+ERROR:    Cancel 0 running task(s), timeout graceful shutdown exceeded
+INFO:     Waiting for application shutdown.
+2025-09-13 19:09:15,329 - mcp.server.streamable_http_manager - INFO - StreamableHTTP session manager shutting down
+INFO:     Application shutdown complete.
+INFO:     Finished server process [86356]
