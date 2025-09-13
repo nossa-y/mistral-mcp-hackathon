@@ -1,10 +1,10 @@
 """
 Normalized data structures for ColdOpen Coach.
 Source-agnostic models for representing social media data.
+Designed for Le Chat integration - MCP servers provide clean data, Le Chat handles conversation coaching.
 """
 
-from datetime import datetime
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict
 from pydantic import BaseModel, Field
 from enum import Enum
 
@@ -46,23 +46,7 @@ class Meta(BaseModel):
 
 
 class Bundle(BaseModel):
-    """Complete normalized response bundle"""
+    """Complete normalized response bundle - ready for Le Chat consumption"""
     person: Person = Field(..., description="Person information")
     posts: List[Post] = Field(default_factory=list, description="Recent posts")
     meta: Meta = Field(..., description="Fetch metadata")
-
-
-class ApproachRequest(BaseModel):
-    """Request for generating conversation approach"""
-    bundles: List[Bundle] = Field(..., description="Social media data bundles")
-    user_context: Dict[str, Any] = Field(default_factory=dict, description="User's context")
-    preferences: Dict[str, Any] = Field(default_factory=dict, description="Generation preferences")
-
-
-class ApproachResponse(BaseModel):
-    """Generated conversation approach"""
-    opener_bold: str = Field(..., description="Bold conversation opener")
-    follow_up_question: str = Field(..., description="Follow-up question")
-    coaching_note: str = Field(..., description="Tone and delivery advice")
-    rationale: Dict[str, Any] = Field(..., description="Why this approach was chosen")
-    fallback_used: bool = Field(default=False, description="Whether fallback mode was used")

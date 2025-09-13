@@ -1,0 +1,57 @@
+{
+  "person": {
+    "name": "@elonmusk",
+    "platform": "x",
+    "handle": "elonmusk",
+    "profile_url": "https://twitter.com/elonmusk",
+    "headline_or_bio": ""
+  },
+  "posts": [
+    {
+      "platform": "x",
+      "post_id": "1234567890",
+      "url": "https://twitter.com/elonmusk/status/1234567890",
+      "created_at_iso": "2024-01-15T10:30:00Z",
+      "text": "Just shipped a new AI agent feature that helps developers debug faster. The future of coding is here! #AI #DevTools #Shipping",
+      "hashtags": [
+        "#AI",
+        "#DevTools",
+        "#Shipping"
+      ],
+      "mentions": [],
+      "engagement": {
+        "likes": 245,
+        "retweets": 67,
+        "replies": 23
+      },
+      "inferred_themes": [
+        "ai_agents",
+        "shipping_quality"
+      ]
+    },
+    {
+      "platform": "x",
+      "post_id": "1234567891",
+      "url": "https://twitter.com/elonmusk/status/1234567891",
+      "created_at_iso": "2024-01-14T15:20:00Z",
+      "text": "Excited to announce our Series A funding! This will help us build the next generation of developer tools.",
+      "hashtags": [],
+      "mentions": [],
+      "engagement": {
+        "likes": 1200,
+        "retweets": 340,
+        "replies": 89
+      },
+      "inferred_themes": [
+        "fundraising",
+        "product_experiments"
+      ]
+    }
+  ],
+  "meta": {
+    "source": "mcp_x",
+    "fetched_at_iso": "2024-01-16T12:00:00Z",
+    "limit": 20,
+    "total_found": 2
+  }
+}
