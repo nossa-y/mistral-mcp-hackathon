@@ -62,20 +62,35 @@ docker buildx build --platform linux/amd64 -f dockerfiles/nodejs22 -t coldopen-c
 
 ### Troubleshooting
 
-#### Error: "/uv.lock": not found
+#### Error: "/uv.lock": not found (FIXED)
 
-This error occurs when the Docker build context doesn't include the required files. Ensure:
+**Issue**: The Docker build was failing because:
+- UV version mismatch (Dockerfile used 0.5.1, AWS environment expected 0.8.15)
+- Incorrect file mount paths in the RUN command
+- Buildspec.yml didn't match AWS CodeBuild environment expectations
 
-1. The build is run from the repository root directory
-2. `coldopen-coach/uv.lock` and `coldopen-coach/pyproject.toml` exist
-3. The Dockerfile paths are correct relative to the build context
+**Resolution**:
+1. ✅ Updated UV version to 0.8.15 in `dockerfiles/python3.13`
+2. ✅ Fixed Docker COPY commands to use bind mounts instead
+3. ✅ Updated `buildspec.yml` to match AWS CodeBuild environment
+4. ✅ Added lambda_handler.py to Docker image
+5. ✅ Fixed Lambda handler reference in CMD
 
 #### CodeBuild Context
 
-The CodeBuild process expects:
-- Repository root as build context
-- `dockerfiles/` directory with runtime-specific Dockerfiles
-- `buildspec.yml` in repository root
+The CodeBuild process now correctly handles:
+- ✅ Repository cloning to `$SRC_DIR` with proper build context
+- ✅ Transport type detection (detects `stdio` for Python MCP servers)
+- ✅ Dynamic build arguments and ECR authentication
+- ✅ Proper Docker file mounting for UV dependency installation
+
+#### Current Build Status
+
+The fixed deployment should now:
+1. Successfully find and use `uv.lock` file via bind mount
+2. Install Python dependencies using UV 0.8.15
+3. Copy all required MCP server files and shared modules
+4. Set correct Lambda handler for AWS deployment
 
 ### Current Limitation
 

@@ -8,27 +8,60 @@ env:
     PROJECT_BUILD_IMAGES_REPOSITORY_URI: ""
     # Source version for tagging
     RESOLVED_SOURCE_VERSION: ""
+    # Default build arguments
+    BUILD_ARG_INSTALL_COMMAND: ""
+    BUILD_ARG_BUILD_COMMAND: ""
+    BUILD_ARG_BUILD_OUTPUT_DIR: ""
+    BUILD_ARG_START_COMMAND: ""
 
 phases:
   pre_build:
     commands:
-      - echo Logging in to Amazon ECR...
-      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
-      - echo Build started on `date`
-      - echo Building the Docker image for runtime $RUNTIME...
+      # Set source directory based on environment
+      - export SRC_DIR="$CODEBUILD_SRC_DIR/$SOURCE_REPOSITORY"
+      # Clone repository if source repository is specified
+      - |
+        if [ -n "$SOURCE_REPOSITORY" ] && [ -n "$SOURCE_BRANCH" ] && [ -n "$SOURCE_REPOSITORY_CREDENTIALS" ]; then
+          git clone --single-branch --branch $SOURCE_BRANCH https://x-access-token:$SOURCE_REPOSITORY_CREDENTIALS@$SOURCE_REPOSITORY.git $SRC_DIR
+        else
+          export SRC_DIR="$CODEBUILD_SRC_DIR"
+        fi
+      # Get resolved source version
+      - export RESOLVED_SOURCE_VERSION=$(git -C $SRC_DIR rev-parse HEAD)
+      # ECR login
+      - aws ecr get-login-password | docker login --username AWS --password-stdin $PROJECT_BUILD_IMAGES_REPOSITORY_URI
+      # Copy handler files if they exist
+      - |
+        if [ -n "$CODEBUILD_SRC_DIR_HANDLERS" ]; then
+          cp -r $CODEBUILD_SRC_DIR_HANDLERS $SRC_DIR/alpic
+        fi
+      # Detect MCP transport type
+      - |
+        export TRANSPORT_TYPE=$( (grep -r "import.*from ['\"]@modelcontextprotocol/sdk/server/\(stdio\|sse\|streamableHttp\)[.'\"]" --include="*.ts" . | grep -o -E "(stdio|sse|streamableHttp)" | head -1 | tr '[:upper:]' '[:lower:]';grep -r "mcp.run(.*transport=['\"]\(stdio\|sse\|streamable-http\|http\)['\"]" --include="*.py" . | grep -o -E "(stdio|sse|streamable-http|http)" | head -1;grep -r "mcp.run(" --include="*.py" . | head -1 | sed 's/.*/stdio/') | head -1)
+      - |
+        if [ -z "$TRANSPORT_TYPE" ]; then
+          echo "Error: No MCP transport found"; exit 1
+        else
+          echo "MCP transport: $TRANSPORT_TYPE"
+        fi
 
   build:
     commands:
       - echo Build started on `date`
-      - echo Building the Docker image...
-      # Build the Docker image using the specified runtime Dockerfile
+      - echo Building the Docker image for runtime $RUNTIME with transport $TRANSPORT_TYPE...
+      # Build the Docker image with all necessary build arguments
       - docker buildx build
           --provenance=false
           --platform linux/amd64
+          --build-arg INSTALL_COMMAND="${BUILD_ARG_INSTALL_COMMAND}"
+          --build-arg BUILD_COMMAND="${BUILD_ARG_BUILD_COMMAND}"
+          --build-arg BUILD_OUTPUT_DIR="${BUILD_ARG_BUILD_OUTPUT_DIR}"
+          --build-arg START_COMMAND="${BUILD_ARG_START_COMMAND}"
+          --build-arg TRANSPORT_TYPE=$TRANSPORT_TYPE
           -t $PROJECT_BUILD_IMAGES_REPOSITORY_URI:$RESOLVED_SOURCE_VERSION
           -t $PROJECT_BUILD_IMAGES_REPOSITORY_URI:latest
-          -f dockerfiles/$RUNTIME
-          .
+          -f $CODEBUILD_SRC_DIR_DOCKERFILES/$RUNTIME
+          $SRC_DIR
 
   post_build:
     commands:
