@@ -1,0 +1,38 @@
+# Multi-stage Docker build for ColdOpen Coach MCP servers
+# Based on AWS Lambda Python 3.13 runtime
+
+# Stage 1: UV builder - get UV binary
+FROM ghcr.io/astral-sh/uv:0.5.1 as uv
+
+# Stage 2: Builder - create requirements and install dependencies
+FROM public.ecr.aws/lambda/python:3.13 as builder
+
+# Copy UV from the builder stage
+COPY --from=uv /uv /bin/uv
+
+# Set working directory to the Lambda task root
+WORKDIR ${LAMBDA_TASK_ROOT}
+
+# Copy project files for dependency resolution
+COPY coldopen-coach/pyproject.toml .
+COPY coldopen-coach/uv.lock .
+
+# Install dependencies to Lambda task root
+# Use UV to export requirements and install to target directory
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv export --frozen --no-emit-workspace --no-dev --no-editable -o requirements.txt && \
+    uv pip install -r requirements.txt --target "${LAMBDA_TASK_ROOT}"
+
+# Stage 3: Runner - final Lambda image
+FROM public.ecr.aws/lambda/python:3.13 as runner
+
+# Copy installed dependencies from builder
+COPY --from=builder ${LAMBDA_TASK_ROOT} ${LAMBDA_TASK_ROOT}
+
+# Copy application code
+COPY coldopen-coach/mcp_servers/ ${LAMBDA_TASK_ROOT}/mcp_servers/
+COPY coldopen-coach/shared/ ${LAMBDA_TASK_ROOT}/shared/
+
+# Set the Lambda handler
+# This will need to be customized based on which MCP server you're deploying
+CMD ["mcp_servers.mcp_x.server.handler"]

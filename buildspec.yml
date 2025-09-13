@@ -1,0 +1,44 @@
+version: 0.2
+
+env:
+  variables:
+    # Default to Python runtime if not specified
+    RUNTIME: python3.13
+    # Repository URI will be provided by CodeBuild environment
+    PROJECT_BUILD_IMAGES_REPOSITORY_URI: ""
+    # Source version for tagging
+    RESOLVED_SOURCE_VERSION: ""
+
+phases:
+  pre_build:
+    commands:
+      - echo Logging in to Amazon ECR...
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+      - echo Build started on `date`
+      - echo Building the Docker image for runtime $RUNTIME...
+
+  build:
+    commands:
+      - echo Build started on `date`
+      - echo Building the Docker image...
+      # Build the Docker image using the specified runtime Dockerfile
+      - docker buildx build
+          --provenance=false
+          --platform linux/amd64
+          -t $PROJECT_BUILD_IMAGES_REPOSITORY_URI:$RESOLVED_SOURCE_VERSION
+          -t $PROJECT_BUILD_IMAGES_REPOSITORY_URI:latest
+          -f dockerfiles/$RUNTIME
+          .
+
+  post_build:
+    commands:
+      - echo Build completed on `date`
+      - echo Pushing the Docker images...
+      # Push both tagged and latest images
+      - docker push $PROJECT_BUILD_IMAGES_REPOSITORY_URI:$RESOLVED_SOURCE_VERSION
+      - docker push $PROJECT_BUILD_IMAGES_REPOSITORY_URI:latest
+      - echo Docker images pushed successfully
+
+artifacts:
+  files:
+    - '**/*'

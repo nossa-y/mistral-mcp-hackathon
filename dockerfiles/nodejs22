@@ -1,0 +1,27 @@
+# Multi-stage Docker build for future HTTP MCP server
+# Based on AWS Lambda Node.js 22 runtime
+
+# Stage 1: Builder - install dependencies
+FROM public.ecr.aws/lambda/nodejs:22 as builder
+
+# Set working directory
+WORKDIR ${LAMBDA_TASK_ROOT}
+
+# Copy package files (when they exist for the future HTTP implementation)
+COPY package.json package-lock.json* ./
+
+# Install dependencies
+RUN npm ci --only=production
+
+# Stage 2: Runner - final Lambda image
+FROM public.ecr.aws/lambda/nodejs:22 as runner
+
+# Copy installed dependencies
+COPY --from=builder ${LAMBDA_TASK_ROOT}/node_modules ${LAMBDA_TASK_ROOT}/node_modules
+
+# Copy application code (future implementation)
+COPY src/ ${LAMBDA_TASK_ROOT}/src/
+COPY package.json ${LAMBDA_TASK_ROOT}/
+
+# Set the Lambda handler for HTTP MCP server
+CMD ["src/server.handler"]

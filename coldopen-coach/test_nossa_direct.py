@@ -12,8 +12,8 @@ from apify_client import ApifyClient
 load_dotenv()
 
 def test_nossa_twitter():
-    """Test fetching data for @Nossa_ym directly via Apify"""
-    print("🐦 Testing Twitter data fetch for @Nossa_ym")
+    """Test fetching data for @bhorowitz directly via Apify"""
+    print("🐦 Testing Twitter data fetch for @bhorowitz")
     print("=" * 50)
 
     # Initialize Apify client
@@ -30,7 +30,7 @@ def test_nossa_twitter():
         print("🚀 Starting Twitter scraper...")
 
         run_input = {
-            "searchTerms": ["from:Nossa_ym"],  # Modern format using search terms
+            "searchTerms": ["from:bhorowitz"],  # Modern format using search terms
             "sort": "Latest",
             "tweetLanguage": "en"
         }
