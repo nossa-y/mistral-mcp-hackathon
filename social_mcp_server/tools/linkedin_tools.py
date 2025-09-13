@@ -25,10 +25,10 @@ class ErrorType:
 
 def get_apify_client() -> ApifyClient:
     """Initialize Apify client with token from environment"""
-    token = os.getenv("APIFY_TOKEN")
-    if not token:
+    from ..config import config
+    if not config.apify_token:
         raise ValueError("APIFY_TOKEN environment variable is required")
-    return ApifyClient(token)
+    return ApifyClient(config.apify_token)
 
 
 def extract_linkedin_username(profile_url: str) -> str:
@@ -126,8 +126,9 @@ def register_linkedin_tools(mcp):
 
         try:
             # Get Apify configuration
+            from ..config import config
             client = get_apify_client()
-            actor_id = os.getenv("APIFY_LINKEDIN_POSTS_ACTOR", "your_linkedin_posts_actor")
+            actor_id = config.apify_linkedin_posts_actor
 
             # Prepare actor input
             actor_input = {

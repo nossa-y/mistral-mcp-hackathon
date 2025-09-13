@@ -470,7 +470,6 @@ coldopen-coach/
 │   └── fetch_data.py          # Demo scripts
 ├── demo_usage.py              # Usage examples and expected I/O
 ├── pyproject.toml             # Modern Python project configuration
-├── requirements.txt           # Python dependencies
 └── uv.lock                    # Dependency lock file
 ```
 
@@ -508,20 +507,20 @@ DEFAULT_POST_LIMIT_LINKEDIN=10
 
 ### Running Current Implementation
 ```bash
-# Install dependencies (using uv - modern Python package manager)
+# Install dependencies (using uv)
 uv sync
 
 # Run the consolidated social MCP server
 uv run python -m social_mcp_server.server
 
 # Or run demo to see expected input/output
-python demo_usage.py
+uv run python demo_usage.py
 
 # Test direct server calls (without MCP client)
-python test_nossa_direct.py
+uv run python test_nossa_direct.py
 ```
 
-**Dependencies**: The project now uses `fastmcp>=0.9.0`, `pydantic>=2.0.0`, and `apify-client>=1.7.0`.
+**Dependencies**: The project uses uv for dependency management with dependencies defined in `pyproject.toml`.
 
 ### MCP Client Configuration (Claude Desktop)
 ```json
@@ -548,7 +547,7 @@ python test_nossa_direct.py
 
 ### Technical Changes
 - **Framework**: Migrated to FastMCP for cleaner server implementation
-- **Dependencies**: Updated to use modern Python tooling (`uv`, `pyproject.toml`)
+- **Dependencies**: Exclusively uses uv for dependency management via `pyproject.toml`
 - **Data Models**: Refined Pydantic models for better Le Chat integration
 - **Error Handling**: Improved error classification and handling in both servers
 - **Theme Inference**: Maintained theme analysis capabilities in shared utilities

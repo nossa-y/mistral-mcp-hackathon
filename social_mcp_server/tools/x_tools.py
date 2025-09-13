@@ -24,10 +24,10 @@ class ErrorType:
 
 def get_apify_client() -> ApifyClient:
     """Initialize Apify client with token from environment"""
-    token = os.getenv("APIFY_TOKEN")
-    if not token:
+    from ..config import config
+    if not config.apify_token:
         raise ValueError("APIFY_TOKEN environment variable is required")
-    return ApifyClient(token)
+    return ApifyClient(config.apify_token)
 
 
 def normalize_x_post(item: Dict[str, Any], handle: str) -> Post:
@@ -99,8 +99,9 @@ def register_x_tools(mcp):
 
         try:
             # Get Apify configuration
+            from ..config import config
             client = get_apify_client()
-            actor_id = os.getenv("APIFY_TWITTER_ACTOR", "apidojo/tweet-scraper")
+            actor_id = config.apify_twitter_actor
 
             # Prepare actor input
             actor_input = {
