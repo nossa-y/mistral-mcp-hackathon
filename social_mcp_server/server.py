@@ -302,6 +302,17 @@ def get_linkedin_posts(profile_url: str, limit: int = 10) -> Dict[str, Any]:
 # Export the FastMCP instance for Lambda usage
 app = mcp
 
+# Vercel handler function
+def handler(request):
+    """Vercel serverless function handler"""
+    # Force HTTP mode for Vercel deployment
+    import os
+    os.environ["HTTP_MODE"] = "true"
+
+    # Get the ASGI app from FastMCP
+    asgi_app = mcp.sse_app  # Use SSE app for HTTP transport
+    return asgi_app
+
 
 def main():
     """Entry point for the CLI script"""
