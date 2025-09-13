@@ -1,26 +1,22 @@
 """
-X/Twitter MCP Server for ColdOpen Coach.
+X/Twitter MCP Server for ColdOpen Coach using FastMCP.
 Fetches recent posts using Apify and returns normalized data.
 """
 
 import os
-import asyncio
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Dict, Any
 
 from apify_client import ApifyClient
-from mcp.server.models import InitializationOptions
-from mcp.server import NotificationOptions, Server
-from mcp.server.stdio import stdio_server
-from mcp.types import Tool, TextContent, ImageContent, EmbeddedResource
+from fastmcp import FastMCP
 
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 from shared.models import Bundle, Person, Post, Meta, Platform
 from shared.theme_inference import ThemeInferenceEngine
 
-
-app = Server("mcp_x")
+# Initialize FastMCP server
+mcp = FastMCP("X/Twitter MCP Server")
 
 # Error handling constants
 class ErrorType:
@@ -41,17 +37,7 @@ def get_apify_client() -> ApifyClient:
 
 
 def normalize_x_post(item: Dict[str, Any], handle: str) -> Post:
-    """
-    Convert Apify X/Twitter actor response item to normalized Post.
-
-    Args:
-        item: Raw item from Apify dataset
-        handle: Twitter handle for reference
-
-    Returns:
-        Normalized Post object
-    """
-    # Extract basic fields
+    """Convert Apify X/Twitter actor response item to normalized Post."""
     post_id = str(item.get("id", ""))
     tweet_url = item.get("url", f"https://twitter.com/{handle}/status/{post_id}")
     text = item.get("text", "")
@@ -60,11 +46,9 @@ def normalize_x_post(item: Dict[str, Any], handle: str) -> Post:
     # Handle date format - Apify usually returns ISO format
     if created_at and not created_at.endswith('Z'):
         try:
-            # Try to parse and convert to ISO format
             dt = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
             created_at = dt.isoformat()
         except ValueError:
-            # Fallback to current time if parsing fails
             created_at = datetime.now(timezone.utc).isoformat()
 
     # Extract hashtags and mentions
@@ -86,7 +70,7 @@ def normalize_x_post(item: Dict[str, Any], handle: str) -> Post:
         "quotes": item.get("quoteCount", 0)
     }
 
-    post = Post(
+    return Post(
         platform=Platform.X,
         post_id=post_id,
         url=tweet_url,
@@ -95,53 +79,26 @@ def normalize_x_post(item: Dict[str, Any], handle: str) -> Post:
         hashtags=hashtags,
         mentions=mentions,
         engagement=engagement,
-        inferred_themes=[]  # Will be populated by theme inference
+        inferred_themes=[]
     )
 
-    return post
 
+@mcp.tool()
+def get_recent_posts(handle: str, limit: int = 20) -> str:
+    """
+    Fetch recent posts from X/Twitter using Apify.
 
-@app.list_tools()
-async def handle_list_tools() -> List[Tool]:
-    """List available tools"""
-    return [
-        Tool(
-            name="x.get_recent_posts",
-            description="Fetch recent posts from X/Twitter using Apify",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "handle": {
-                        "type": "string",
-                        "description": "Twitter handle (without @)"
-                    },
-                    "limit": {
-                        "type": "integer",
-                        "description": "Maximum number of posts to fetch",
-                        "default": 20
-                    }
-                },
-                "required": ["handle"]
-            }
-        )
-    ]
+    Args:
+        handle: Twitter handle (without @)
+        limit: Maximum number of posts to fetch (default: 20)
 
-
-@app.call_tool()
-async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> Sequence[TextContent | ImageContent | EmbeddedResource]:
-    """Handle tool calls"""
-
-    if name != "x.get_recent_posts":
-        raise ValueError(f"Unknown tool: {name}")
-
-    handle = arguments.get("handle", "").strip().replace("@", "")
-    limit = arguments.get("limit", 20)
+    Returns:
+        JSON string with the Bundle containing person info, posts, and metadata
+    """
+    handle = handle.strip().replace("@", "")
 
     if not handle:
-        return [TextContent(
-            type="text",
-            text=f"Error: {ErrorType.INVALID_INPUT} - Handle is required"
-        )]
+        return f"Error: {ErrorType.INVALID_INPUT} - Handle is required"
 
     try:
         # Get Apify configuration
@@ -163,10 +120,7 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> Sequence[Tex
         items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
 
         if not items:
-            return [TextContent(
-                type="text",
-                text=f"Error: {ErrorType.NOT_FOUND} - No recent posts found for @{handle}"
-            )]
+            return f"Error: {ErrorType.NOT_FOUND} - No recent posts found for @{handle}"
 
         # Convert to normalized format
         posts = []
@@ -179,10 +133,7 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> Sequence[Tex
                 continue
 
         if not posts:
-            return [TextContent(
-                type="text",
-                text=f"Error: {ErrorType.SCHEMA_MISMATCH} - Could not parse any posts"
-            )]
+            return f"Error: {ErrorType.SCHEMA_MISMATCH} - Could not parse any posts"
 
         # Apply theme inference
         ThemeInferenceEngine.infer_themes_bulk(posts)
@@ -198,7 +149,7 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> Sequence[Tex
 
         # Create metadata
         meta = Meta(
-            source="mcp_x",
+            source="mcp_x_fastmcp",
             fetched_at_iso=datetime.now(timezone.utc).isoformat(),
             limit=limit,
             total_found=len(posts)
@@ -211,10 +162,7 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> Sequence[Tex
             meta=meta
         )
 
-        return [TextContent(
-            type="text",
-            text=bundle.model_dump_json(indent=2)
-        )]
+        return bundle.model_dump_json(indent=2)
 
     except Exception as e:
         error_msg = str(e)
@@ -229,28 +177,7 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> Sequence[Tex
         else:
             error_type = ErrorType.API_ERROR
 
-        return [TextContent(
-            type="text",
-            text=f"Error: {error_type} - {error_msg}"
-        )]
-
-
-async def main():
-    """Run the MCP server"""
-    async with stdio_server() as (read_stream, write_stream):
-        await app.run(
-            read_stream,
-            write_stream,
-            InitializationOptions(
-                server_name="mcp_x",
-                server_version="0.1.0",
-                capabilities=app.get_capabilities(
-                    notification_options=NotificationOptions(),
-                    experimental_capabilities={},
-                ),
-            ),
-        )
-
+        return f"Error: {error_type} - {error_msg}"
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    mcp.run()

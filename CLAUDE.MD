@@ -1,18 +1,28 @@
-MCP Central Server — HTTP Spec for Le Chat (Alpic Deploy)
-Purpose: Claude Code will generate a single HTTP‑exposed MCP server ("Social Snapshot Hub") that Mistral Le Chat connects to. The hub orchestrates:
-Apify Tweet Scraper V2 (X/Twitter recent posts)
+# ColdOpen Coach - MCP Server Collection
 
+## Current Implementation Status (Python)
 
-LinkedIn MCP (recent activity/posts only)
+This project currently consists of **separate Python MCP servers** for the Mistral MCP Hackathon:
 
+- **mcp_x** - Twitter/X integration via Apify
+- **mcp_linkedin** - LinkedIn integration (optional)
+- **mcp_approach_coach** - Cold outreach coaching logic
 
-Apollo.io MCP (multi‑profile candidate search; use top two)
+Each server runs independently using stdio transport and can be configured in MCP clients like Claude Desktop or Le Chat.
 
+## Future HTTP Specification (Node.js/TypeScript)
 
-Face Recognition Placeholder (non‑functional, consent‑gated stub)
+The specification below outlines a **future consolidated HTTP MCP server** ("Social Snapshot Hub") for Le Chat deployment on Alpic. This would replace the current separate Python servers with a single HTTP-exposed server.
 
+---
 
-This document is the authoritative build spec for Claude to implement the server.
+# HTTP MCP Server Specification (Future Implementation)
+
+Purpose: A single HTTP‑exposed MCP server that Mistral Le Chat connects to. The hub would orchestrate:
+- Apify Tweet Scraper V2 (X/Twitter recent posts)
+- LinkedIn MCP (recent activity/posts only)
+- Apollo.io MCP (multi‑profile candidate search; use top two)
+- Face Recognition Placeholder (non‑functional, consent‑gated stub)
 
 1) Product Scope & Guardrails (Step‑1+)
 In scope
@@ -311,11 +321,13 @@ S3_REGION=...
 S3_PREFIX=snapshots/
 
 
-9) Build & Runtime (Node/TS)
+9) Build & Runtime (Node/TS) - Future Implementation
 Language: TypeScript (Node 20+).
 
 
 Core libs: @modelcontextprotocol/sdk (HTTP server), zod, axios/undici, pino, dayjs, uuid, optional ioredis (cache).
+
+Note: Current implementation uses Python with separate MCP servers.
 
 
 Structure
@@ -436,5 +448,83 @@ Log redaction for tokens and cookies.
 
 
 
-End of HTTP Spec — Ready for Claude Code generation
+End of HTTP Spec — For Future Implementation
+
+---
+
+## Current Python Implementation Details
+
+### Project Structure
+```
+coldopen-coach/
+├── mcp_servers/
+│   ├── mcp_x/
+│   │   └── server.py          # Twitter/X MCP server
+│   ├── mcp_linkedin/
+│   │   └── server.py          # LinkedIn MCP server
+│   └── mcp_approach_coach/
+│       └── server.py          # Coaching MCP server
+├── shared/
+│   ├── models.py              # Normalized data models
+│   └── theme_inference.py     # Theme analysis
+├── demo/
+│   └── fetch_data.py          # Demo scripts
+└── requirements.txt           # Python dependencies
+```
+
+### Current MCP Tools Available
+
+#### mcp_x server (Twitter/X)
+- `fetch_recent_posts` - Get recent posts from X/Twitter user
+- `search_posts` - Search posts by keywords/hashtags
+
+#### mcp_linkedin server (LinkedIn)
+- `get_person_profile` - Get LinkedIn profile information
+- `get_recent_activity` - Fetch recent LinkedIn activity
+
+#### mcp_approach_coach server (Coaching)
+- `analyze_social_context` - Analyze posts for conversation starters
+- `generate_openers` - Create personalized outreach messages
+- `suggest_themes` - Identify common themes and interests
+
+### Environment Configuration
+```env
+APIFY_TOKEN=your_apify_token_here
+LINKEDIN_COOKIE=li_at=your_linkedin_cookie_here  # Optional
+DEBUG=true
+```
+
+### Running Current Implementation
+```bash
+# Install dependencies
+uv sync
+
+# Run individual servers
+uv run python -m mcp_servers.mcp_x.server
+uv run python -m mcp_servers.mcp_linkedin.server
+uv run python -m mcp_servers.mcp_approach_coach.server
+```
+
+### MCP Client Configuration (Claude Desktop)
+```json
+{
+  "mcpServers": {
+    "coldopen-x": {
+      "command": "uv",
+      "args": ["run", "python", "-m", "mcp_servers.mcp_x.server"],
+      "cwd": "/path/to/mistral-mcp-hackathon/coldopen-coach"
+    },
+    "coldopen-linkedin": {
+      "command": "uv",
+      "args": ["run", "python", "-m", "mcp_servers.mcp_linkedin.server"],
+      "cwd": "/path/to/mistral-mcp-hackathon/coldopen-coach"
+    },
+    "coldopen-coach": {
+      "command": "uv",
+      "args": ["run", "python", "-m", "mcp_servers.mcp_approach_coach.server"],
+      "cwd": "/path/to/mistral-mcp-hackathon/coldopen-coach"
+    }
+  }
+}
+```
 

@@ -1,28 +1,24 @@
 """
-LinkedIn MCP Server for ColdOpen Coach.
+LinkedIn MCP Server for ColdOpen Coach using FastMCP.
 Fetches recent posts using Apify and returns normalized data.
 """
 
 import os
-import asyncio
 import re
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Dict, Any
 from urllib.parse import urlparse
 
 from apify_client import ApifyClient
-from mcp.server.models import InitializationOptions
-from mcp.server import NotificationOptions, Server
-from mcp.server.stdio import stdio_server
-from mcp.types import Tool, TextContent, ImageContent, EmbeddedResource
+from fastmcp import FastMCP
 
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 from shared.models import Bundle, Person, Post, Meta, Platform
 from shared.theme_inference import ThemeInferenceEngine
 
-
-app = Server("mcp_linkedin")
+# Initialize FastMCP server
+mcp = FastMCP("LinkedIn MCP Server")
 
 # Error handling constants
 class ErrorType:
@@ -42,48 +38,29 @@ def get_apify_client() -> ApifyClient:
     return ApifyClient(token)
 
 
-def extract_linkedin_username(profile_url: str) -> Optional[str]:
-    """
-    Extract LinkedIn username from profile URL.
-
-    Args:
-        profile_url: LinkedIn profile URL
-
-    Returns:
-        Username or None if invalid
-    """
+def extract_linkedin_username(profile_url: str) -> str:
+    """Extract LinkedIn username from profile URL."""
     try:
-        # Handle various LinkedIn URL formats
         if not profile_url.startswith(('http://', 'https://')):
             profile_url = f"https://{profile_url}"
 
         parsed = urlparse(profile_url)
         if 'linkedin.com' not in parsed.netloc:
-            return None
+            raise ValueError("Invalid LinkedIn URL")
 
-        # Extract username from path like /in/username/ or /in/username
         path = parsed.path.strip('/')
         if path.startswith('in/'):
             username = path[3:].strip('/')
-            return username if username else None
+            if username:
+                return username
 
-        return None
-    except:
-        return None
+        raise ValueError("Could not extract username from LinkedIn URL")
+    except Exception as e:
+        raise ValueError(f"Invalid LinkedIn profile URL: {e}")
 
 
 def normalize_linkedin_post(item: Dict[str, Any], profile_url: str) -> Post:
-    """
-    Convert Apify LinkedIn actor response item to normalized Post.
-
-    Args:
-        item: Raw item from Apify dataset
-        profile_url: LinkedIn profile URL for reference
-
-    Returns:
-        Normalized Post object
-    """
-    # Extract basic fields - LinkedIn post structure may vary by actor
+    """Convert Apify LinkedIn actor response item to normalized Post."""
     post_id = str(item.get("postId", item.get("id", "")))
     post_url = item.get("postUrl", item.get("url", ""))
     text = item.get("text", item.get("content", ""))
@@ -92,28 +69,22 @@ def normalize_linkedin_post(item: Dict[str, Any], profile_url: str) -> Post:
     # Handle date format
     if created_at:
         try:
-            # Try to parse various date formats
             if isinstance(created_at, str):
                 if not created_at.endswith('Z') and '+' not in created_at:
-                    # Assume UTC if no timezone info
                     created_at = created_at + 'Z'
                 dt = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
                 created_at = dt.isoformat()
         except ValueError:
-            # Fallback to current time if parsing fails
             created_at = datetime.now(timezone.utc).isoformat()
     else:
         created_at = datetime.now(timezone.utc).isoformat()
 
-    # Extract hashtags from text
+    # Extract hashtags and mentions
     hashtags = []
+    mentions = []
     if text:
         hashtag_matches = re.findall(r'#(\w+)', text)
         hashtags = [f"#{tag}" for tag in hashtag_matches]
-
-    # Extract mentions from text
-    mentions = []
-    if text:
         mention_matches = re.findall(r'@(\w+)', text)
         mentions = mention_matches
 
@@ -124,7 +95,7 @@ def normalize_linkedin_post(item: Dict[str, Any], profile_url: str) -> Post:
         "shares": item.get("sharesCount", item.get("reposts", 0))
     }
 
-    post = Post(
+    return Post(
         platform=Platform.LINKEDIN,
         post_id=post_id,
         url=post_url,
@@ -133,68 +104,36 @@ def normalize_linkedin_post(item: Dict[str, Any], profile_url: str) -> Post:
         hashtags=hashtags,
         mentions=mentions,
         engagement=engagement,
-        inferred_themes=[]  # Will be populated by theme inference
+        inferred_themes=[]
     )
 
-    return post
 
+@mcp.tool()
+def get_recent_posts(profile_url: str, limit: int = 10) -> str:
+    """
+    Fetch recent posts from LinkedIn using Apify.
 
-@app.list_tools()
-async def handle_list_tools() -> List[Tool]:
-    """List available tools"""
-    return [
-        Tool(
-            name="linkedin.get_recent_posts",
-            description="Fetch recent posts from LinkedIn using Apify",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "profile_url": {
-                        "type": "string",
-                        "description": "LinkedIn profile URL (e.g., https://linkedin.com/in/username)"
-                    },
-                    "limit": {
-                        "type": "integer",
-                        "description": "Maximum number of posts to fetch",
-                        "default": 10
-                    }
-                },
-                "required": ["profile_url"]
-            }
-        )
-    ]
+    Args:
+        profile_url: LinkedIn profile URL (e.g., https://linkedin.com/in/username)
+        limit: Maximum number of posts to fetch (default: 10)
 
+    Returns:
+        JSON string with the Bundle containing person info, posts, and metadata
+    """
+    if not profile_url.strip():
+        return f"Error: {ErrorType.INVALID_INPUT} - Profile URL is required"
 
-@app.call_tool()
-async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> Sequence[TextContent | ImageContent | EmbeddedResource]:
-    """Handle tool calls"""
-
-    if name != "linkedin.get_recent_posts":
-        raise ValueError(f"Unknown tool: {name}")
-
-    profile_url = arguments.get("profile_url", "").strip()
-    limit = arguments.get("limit", 10)
-
-    if not profile_url:
-        return [TextContent(
-            type="text",
-            text=f"Error: {ErrorType.INVALID_INPUT} - Profile URL is required"
-        )]
-
-    username = extract_linkedin_username(profile_url)
-    if not username:
-        return [TextContent(
-            type="text",
-            text=f"Error: {ErrorType.INVALID_INPUT} - Invalid LinkedIn profile URL"
-        )]
+    try:
+        username = extract_linkedin_username(profile_url)
+    except ValueError as e:
+        return f"Error: {ErrorType.INVALID_INPUT} - {e}"
 
     try:
         # Get Apify configuration
         client = get_apify_client()
-        # Note: This is a placeholder actor - you'll need to specify the actual LinkedIn posts actor
         actor_id = os.getenv("APIFY_LINKEDIN_POSTS_ACTOR", "your_linkedin_posts_actor")
 
-        # Prepare actor input - this will vary based on the specific LinkedIn actor
+        # Prepare actor input
         actor_input = {
             "profiles": [profile_url],
             "postsPerProfile": limit,
@@ -208,10 +147,7 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> Sequence[Tex
         items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
 
         if not items:
-            return [TextContent(
-                type="text",
-                text=f"Error: {ErrorType.NOT_FOUND} - No recent posts found for profile"
-            )]
+            return f"Error: {ErrorType.NOT_FOUND} - No recent posts found for profile"
 
         # Convert to normalized format
         posts = []
@@ -224,10 +160,7 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> Sequence[Tex
                 continue
 
         if not posts:
-            return [TextContent(
-                type="text",
-                text=f"Error: {ErrorType.SCHEMA_MISMATCH} - Could not parse any posts"
-            )]
+            return f"Error: {ErrorType.SCHEMA_MISMATCH} - Could not parse any posts"
 
         # Apply theme inference
         ThemeInferenceEngine.infer_themes_bulk(posts)
@@ -242,7 +175,7 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> Sequence[Tex
 
         # Create metadata
         meta = Meta(
-            source="mcp_linkedin",
+            source="mcp_linkedin_fastmcp",
             fetched_at_iso=datetime.now(timezone.utc).isoformat(),
             limit=limit,
             total_found=len(posts)
@@ -255,10 +188,7 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> Sequence[Tex
             meta=meta
         )
 
-        return [TextContent(
-            type="text",
-            text=bundle.model_dump_json(indent=2)
-        )]
+        return bundle.model_dump_json(indent=2)
 
     except Exception as e:
         error_msg = str(e)
@@ -273,28 +203,7 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> Sequence[Tex
         else:
             error_type = ErrorType.API_ERROR
 
-        return [TextContent(
-            type="text",
-            text=f"Error: {error_type} - {error_msg}"
-        )]
-
-
-async def main():
-    """Run the MCP server"""
-    async with stdio_server() as (read_stream, write_stream):
-        await app.run(
-            read_stream,
-            write_stream,
-            InitializationOptions(
-                server_name="mcp_linkedin",
-                server_version="0.1.0",
-                capabilities=app.get_capabilities(
-                    notification_options=NotificationOptions(),
-                    experimental_capabilities={},
-                ),
-            ),
-        )
-
+        return f"Error: {error_type} - {error_msg}"
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    mcp.run()
