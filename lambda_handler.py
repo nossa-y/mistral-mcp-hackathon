@@ -16,76 +16,202 @@ from social_mcp_server.server import app as social_app
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Single consolidated server
+# Single consolidated server that handles both X and LinkedIn
 SERVER_APP = social_app
-SERVERS = {
-    'x': x_app,
-    'linkedin': linkedin_app,
-}
-
-def get_server_type() -> str:
-    """Get the server type from environment variable."""
-    return os.environ.get('MCP_SERVER_TYPE', 'x')
 
 async def handle_mcp_request(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
-    """Handle MCP request through the appropriate server."""
+    """Handle MCP request through the social MCP server."""
     try:
-        server_type = get_server_type()
-
-        if server_type not in SERVERS:
-            raise ValueError(f"Unknown server type: {server_type}")
-
-        app = SERVERS[server_type]
-
         # Extract MCP request from Lambda event
-        # This assumes the event contains the MCP request in the body
         body = event.get('body', '{}')
         if isinstance(body, str):
-            mcp_request = json.loads(body)
+            try:
+                mcp_request = json.loads(body)
+            except json.JSONDecodeError as e:
+                logger.error(f"Invalid JSON in request body: {e}")
+                return create_error_response(-32700, "Parse error", f"Invalid JSON: {e}")
         else:
             mcp_request = body
 
-        logger.info(f"Processing MCP request for {server_type}: {mcp_request.get('method', 'unknown')}")
+        logger.info(f"Processing MCP request: {mcp_request.get('method', 'unknown')}")
 
-        # Process the request through the MCP server
-        # Note: This is a simplified handler - you may need to adapt based on
-        # your specific MCP server implementation and transport needs
+        # Validate MCP request structure
+        if not isinstance(mcp_request, dict):
+            return create_error_response(-32600, "Invalid Request", "Request must be a JSON object")
 
-        # For now, return a basic response structure
-        return {
-            'statusCode': 200,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
-            'body': json.dumps({
-                'jsonrpc': '2.0',
-                'id': mcp_request.get('id'),
-                'result': {
-                    'message': f'MCP {server_type} server is running',
-                    'server_type': server_type
-                }
-            })
-        }
+        request_id = mcp_request.get('id')
+        method = mcp_request.get('method')
+
+        if not method:
+            return create_error_response(-32600, "Invalid Request", "Missing method field", request_id)
+
+        # Handle different MCP methods
+        if method == 'tools/list':
+            return handle_tools_list(request_id)
+        elif method == 'tools/call':
+            return await handle_tool_call(mcp_request, request_id)
+        elif method == 'initialize':
+            return handle_initialize(request_id)
+        else:
+            return create_error_response(-32601, "Method not found", f"Unknown method: {method}", request_id)
 
     except Exception as e:
-        logger.error(f"Error handling MCP request: {str(e)}")
-        return {
-            'statusCode': 500,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
-            'body': json.dumps({
-                'jsonrpc': '2.0',
-                'id': event.get('body', {}).get('id') if isinstance(event.get('body'), dict) else None,
-                'error': {
-                    'code': -32603,
-                    'message': 'Internal error',
-                    'data': str(e)
-                }
-            })
+        logger.error(f"Unexpected error handling MCP request: {str(e)}", exc_info=True)
+        request_id = None
+        try:
+            if isinstance(event.get('body'), dict):
+                request_id = event['body'].get('id')
+            elif isinstance(event.get('body'), str):
+                parsed = json.loads(event['body'])
+                request_id = parsed.get('id')
+        except:
+            pass
+
+        return create_error_response(-32603, "Internal error", str(e), request_id)
+
+def create_error_response(code: int, message: str, data: Optional[str] = None, request_id: Optional[str] = None) -> Dict[str, Any]:
+    """Create a standardized MCP error response."""
+    error_response = {
+        'statusCode': 200,  # MCP errors are still HTTP 200
+        'headers': {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+        },
+        'body': json.dumps({
+            'jsonrpc': '2.0',
+            'id': request_id,
+            'error': {
+                'code': code,
+                'message': message,
+                'data': data
+            }
+        })
+    }
+    logger.error(f"MCP Error Response: {code} - {message}" + (f" - {data}" if data else ""))
+    return error_response
+
+def create_success_response(result: Any, request_id: Optional[str] = None) -> Dict[str, Any]:
+    """Create a standardized MCP success response."""
+    return {
+        'statusCode': 200,
+        'headers': {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+        },
+        'body': json.dumps({
+            'jsonrpc': '2.0',
+            'id': request_id,
+            'result': result
+        })
+    }
+
+def handle_initialize(request_id: Optional[str]) -> Dict[str, Any]:
+    """Handle MCP initialize method."""
+    logger.info("Handling initialize request")
+    return create_success_response({
+        'protocolVersion': '2024-11-05',
+        'capabilities': {
+            'tools': {}
+        },
+        'serverInfo': {
+            'name': 'Social MCP Server',
+            'version': '1.0.0'
         }
+    }, request_id)
+
+def handle_tools_list(request_id: Optional[str]) -> Dict[str, Any]:
+    """Handle MCP tools/list method."""
+    logger.info("Handling tools/list request")
+    tools = [
+        {
+            'name': 'get_x_posts',
+            'description': 'Fetch recent posts from X/Twitter using Apify',
+            'inputSchema': {
+                'type': 'object',
+                'properties': {
+                    'handle': {
+                        'type': 'string',
+                        'description': 'Twitter handle (without @)'
+                    },
+                    'limit': {
+                        'type': 'integer',
+                        'description': 'Maximum number of posts to fetch (default: 20)',
+                        'default': 20
+                    }
+                },
+                'required': ['handle']
+            }
+        },
+        {
+            'name': 'get_linkedin_posts',
+            'description': 'Fetch recent posts from LinkedIn using Apify',
+            'inputSchema': {
+                'type': 'object',
+                'properties': {
+                    'profile_url': {
+                        'type': 'string',
+                        'description': 'LinkedIn profile URL (e.g., https://linkedin.com/in/username)'
+                    },
+                    'limit': {
+                        'type': 'integer',
+                        'description': 'Maximum number of posts to fetch (default: 10)',
+                        'default': 10
+                    }
+                },
+                'required': ['profile_url']
+            }
+        }
+    ]
+
+    return create_success_response({'tools': tools}, request_id)
+
+async def handle_tool_call(mcp_request: Dict[str, Any], request_id: Optional[str]) -> Dict[str, Any]:
+    """Handle MCP tools/call method."""
+    try:
+        params = mcp_request.get('params', {})
+        tool_name = params.get('name')
+        arguments = params.get('arguments', {})
+
+        logger.info(f"Calling tool: {tool_name} with arguments: {arguments}")
+
+        if tool_name == 'get_x_posts':
+            # Import and call the function from the social server
+            from social_mcp_server.server import get_x_posts
+            # FastMCP decorates functions as FunctionTool objects, need to access .fn
+            actual_function = get_x_posts.fn if hasattr(get_x_posts, 'fn') else get_x_posts
+            result = actual_function(**arguments)
+
+            return create_success_response({
+                'content': [
+                    {
+                        'type': 'text',
+                        'text': result
+                    }
+                ]
+            }, request_id)
+
+        elif tool_name == 'get_linkedin_posts':
+            # Import and call the function from the social server
+            from social_mcp_server.server import get_linkedin_posts
+            # FastMCP decorates functions as FunctionTool objects, need to access .fn
+            actual_function = get_linkedin_posts.fn if hasattr(get_linkedin_posts, 'fn') else get_linkedin_posts
+            result = actual_function(**arguments)
+
+            return create_success_response({
+                'content': [
+                    {
+                        'type': 'text',
+                        'text': result
+                    }
+                ]
+            }, request_id)
+
+        else:
+            return create_error_response(-32601, "Method not found", f"Unknown tool: {tool_name}", request_id)
+
+    except Exception as e:
+        logger.error(f"Error calling tool: {str(e)}", exc_info=True)
+        return create_error_response(-32603, "Internal error", f"Tool execution failed: {str(e)}", request_id)
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """AWS Lambda handler entry point."""
