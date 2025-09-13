@@ -43,13 +43,12 @@ class ColdOpenCoachDemo:
 
     async def fetch_twitter_data(self, handle: str) -> dict:
         """
-        Simulate fetching Twitter data using the MCP server.
-        In a real implementation, this would call the MCP server.
+        Demo using mock data that represents what the MCP server would return.
+        Shows the raw data structure returned by twitter.get_posts tool.
         """
-        print(f"🐦 Fetching Twitter data for @{handle}...")
+        print(f"🐦 Calling MCP server tool: twitter.get_posts(handle='{handle}')")
 
-        # For demo purposes, return mock data
-        # In real implementation, this would use MCP client to call the server
+        # Mock data representing actual MCP server response
         mock_bundle = {
             "person": {
                 "name": f"@{handle}",
@@ -67,7 +66,7 @@ class ColdOpenCoachDemo:
                     "text": "Just shipped a new AI agent feature that helps developers debug faster. The future of coding is here! #AI #DevTools #Shipping",
                     "hashtags": ["#AI", "#DevTools", "#Shipping"],
                     "mentions": [],
-                    "engagement": {"likes": 245, "retweets": 67, "replies": 23},
+                    "engagement": {"likes": 245, "retweets": 67, "replies": 23, "quotes": 12},
                     "inferred_themes": ["ai_agents", "shipping_quality"]
                 },
                 {
@@ -78,32 +77,30 @@ class ColdOpenCoachDemo:
                     "text": "Excited to announce our Series A funding! This will help us build the next generation of developer tools.",
                     "hashtags": [],
                     "mentions": [],
-                    "engagement": {"likes": 1200, "retweets": 340, "replies": 89},
+                    "engagement": {"likes": 1200, "retweets": 340, "replies": 89, "quotes": 45},
                     "inferred_themes": ["fundraising", "product_experiments"]
                 }
             ],
             "meta": {
-                "source": "mcp_x",
+                "source": "twitter.get_posts",
                 "fetched_at_iso": "2024-01-16T12:00:00Z",
                 "limit": 20,
                 "total_found": 2
             }
         }
 
-        print(f"✅ Found {len(mock_bundle['posts'])} recent tweets")
+        print(f"✅ Retrieved data bundle with {len(mock_bundle['posts'])} posts")
         return mock_bundle
 
     async def fetch_linkedin_data(self, profile_url: str) -> dict:
         """
-        Simulate fetching LinkedIn data using the MCP server.
-        In a real implementation, this would call the MCP server.
+        Demo using mock data that represents what the MCP server would return.
+        Shows the raw data structure returned by linkedin.get_posts tool.
         """
-        print(f"💼 Fetching LinkedIn data for {profile_url}...")
-
-        # Extract username for display
         username = profile_url.split('/in/')[-1].strip('/')
+        print(f"💼 Calling MCP server tool: linkedin.get_posts(profile_url='{profile_url}')")
 
-        # For demo purposes, return mock data
+        # Mock data representing actual MCP server response
         mock_bundle = {
             "person": {
                 "name": f"LinkedIn User ({username})",
@@ -125,111 +122,143 @@ class ColdOpenCoachDemo:
                 }
             ],
             "meta": {
-                "source": "mcp_linkedin",
+                "source": "linkedin.get_posts",
                 "fetched_at_iso": "2024-01-16T12:00:00Z",
                 "limit": 10,
                 "total_found": 1
             }
         }
 
-        print(f"✅ Found {len(mock_bundle['posts'])} recent LinkedIn posts")
+        print(f"✅ Retrieved data bundle with {len(mock_bundle['posts'])} posts")
         return mock_bundle
 
-    async def generate_approach(self, bundles: list, user_context: dict, preferences: dict) -> dict:
+    def analyze_retrieved_data(self, bundles: list) -> dict:
         """
-        Simulate generating conversation approach using the orchestrator.
-        In a real implementation, this would call the MCP server.
+        Analyze the raw data retrieved from MCP tools.
+        This shows what analysis can be done on the retrieved data.
         """
-        print("🧠 Generating conversation approach...")
+        print("📊 Analyzing retrieved data...")
 
-        # For demo purposes, simulate the orchestrator logic
+        # Combine all posts from all bundles
         all_posts = []
+        platforms = set()
         for bundle in bundles:
             all_posts.extend(bundle.get('posts', []))
+            platforms.add(bundle.get('person', {}).get('platform'))
 
-        # Extract themes
+        # Extract and analyze themes
         all_themes = set()
+        theme_frequency = {}
         for post in all_posts:
-            all_themes.update(post.get('inferred_themes', []))
+            for theme in post.get('inferred_themes', []):
+                all_themes.add(theme)
+                theme_frequency[theme] = theme_frequency.get(theme, 0) + 1
 
-        themes = list(all_themes)
-        primary_theme = themes[0] if themes else "general_networking"
-
-        # Generate mock approach response
-        if "ai_agents" in themes:
-            opener = "**I'm fascinated by the evolution of AI tooling for developers. What's your take on where the biggest opportunities are?**"
-            follow_up = "Are you seeing any particular patterns in what developers need most right now?"
-            coaching = "Lead with curiosity about their expertise. AI is clearly a passion area."
-        elif "hiring" in themes:
-            opener = "**The talent market is so competitive right now. What's been your experience building strong engineering teams?**"
-            follow_up = "What qualities do you look for that might not show up on a resume?"
-            coaching = "Focus on their leadership perspective. They're clearly thinking about team building."
-        else:
-            opener = "**What brings you to this event? Always curious to hear what other folks in tech are working on.**"
-            follow_up = "What's the most interesting challenge you're tackling these days?"
-            coaching = "Keep it open and genuine. Let them lead the conversation direction."
-
-        mock_response = {
-            "system": "You are a conversation coach...",
-            "developer": json.dumps({
-                "instructions": "Generate a conversation approach...",
-                "required_output": "..."
-            }, indent=2),
-            "user": json.dumps({
-                "person_context": user_context,
-                "recent_posts": all_posts[:3],  # Top 3
-                "detected_themes": themes,
-                "posts_considered": len(all_posts),
-                "preferences": preferences
-            }, indent=2),
-            "fallback_used": len(all_posts) == 0,
-            "generated_approach": {
-                "opener_bold": opener,
-                "follow_up_question": follow_up,
-                "coaching_note": coaching,
-                "rationale": {
-                    "theme_used": primary_theme,
-                    "source_refs": [post.get('url', '') for post in all_posts[:2]],
-                    "confidence": "high" if len(all_posts) > 1 else "medium"
-                },
-                "fallback_used": False
-            }
+        # Analyze engagement
+        total_engagement = {
+            "likes": sum(post.get('engagement', {}).get('likes', 0) for post in all_posts),
+            "retweets": sum(post.get('engagement', {}).get('retweets', 0) for post in all_posts),
+            "replies": sum(post.get('engagement', {}).get('replies', 0) for post in all_posts),
+            "comments": sum(post.get('engagement', {}).get('comments', 0) for post in all_posts),
+            "shares": sum(post.get('engagement', {}).get('shares', 0) for post in all_posts)
         }
 
-        print("✅ Generated conversation approach")
-        return mock_response
+        # Most recent posts
+        recent_posts = sorted(all_posts, key=lambda p: p.get('created_at_iso', ''), reverse=True)[:3]
 
-    def display_results(self, approach_data: dict):
-        """Display the generated conversation approach"""
+        analysis = {
+            "summary": {
+                "total_posts": len(all_posts),
+                "platforms_covered": list(platforms),
+                "unique_themes": len(all_themes),
+                "most_recent_post_date": recent_posts[0].get('created_at_iso', '')[:10] if recent_posts else None
+            },
+            "theme_analysis": {
+                "detected_themes": sorted(list(all_themes)),
+                "theme_frequency": dict(sorted(theme_frequency.items(), key=lambda x: x[1], reverse=True))
+            },
+            "engagement_analysis": {
+                "total_engagement": total_engagement,
+                "average_likes_per_post": round(total_engagement['likes'] / len(all_posts), 1) if all_posts else 0
+            },
+            "recent_posts_preview": [
+                {
+                    "date": post.get('created_at_iso', '')[:10],
+                    "platform": post.get('platform'),
+                    "text_preview": post.get('text', '')[:100] + "..." if len(post.get('text', '')) > 100 else post.get('text', ''),
+                    "themes": post.get('inferred_themes', []),
+                    "engagement": post.get('engagement', {})
+                } for post in recent_posts
+            ]
+        }
+
+        print("✅ Data analysis complete")
+        return analysis
+
+    def display_retrieved_data(self, bundles: list):
+        """Display the raw data retrieved from MCP tools"""
         print("\n" + "="*60)
-        print("🎯 CONVERSATION APPROACH")
+        print("📦 RETRIEVED DATA FROM MCP TOOLS")
         print("="*60)
 
-        approach = approach_data.get('generated_approach', {})
+        for i, bundle in enumerate(bundles, 1):
+            person = bundle.get('person', {})
+            posts = bundle.get('posts', [])
+            meta = bundle.get('meta', {})
 
-        print("\n🗣️  OPENER:")
-        print(f"   {approach.get('opener_bold', 'N/A')}")
+            print(f"\n📋 BUNDLE {i}: {person.get('platform', '').upper()}")
+            print(f"   Person: {person.get('name', 'Unknown')}")
+            print(f"   Profile: {person.get('profile_url', 'N/A')}")
+            print(f"   Source: {meta.get('source', 'N/A')}")
+            print(f"   Fetched: {meta.get('fetched_at_iso', 'N/A')[:19]}")
+            print(f"   Posts found: {len(posts)}")
 
-        print("\n❓ FOLLOW-UP:")
-        print(f"   {approach.get('follow_up_question', 'N/A')}")
+            for j, post in enumerate(posts[:2], 1):  # Show first 2 posts
+                print(f"\n   📝 POST {j}:")
+                print(f"      Date: {post.get('created_at_iso', '')[:10]}")
+                print(f"      Text: {post.get('text', '')[:120]}...")
+                print(f"      Themes: {', '.join(post.get('inferred_themes', []))}")
+                engagement = post.get('engagement', {})
+                eng_str = ', '.join([f"{k}: {v}" for k, v in engagement.items() if v > 0])
+                print(f"      Engagement: {eng_str}")
 
-        print("\n💡 COACHING NOTE:")
-        print(f"   {approach.get('coaching_note', 'N/A')}")
+        print("\n" + "="*60)
 
-        print("\n📊 RATIONALE:")
-        rationale = approach.get('rationale', {})
-        print(f"   Theme: {rationale.get('theme_used', 'N/A')}")
-        print(f"   Confidence: {rationale.get('confidence', 'N/A')}")
+    def display_analysis(self, analysis: dict):
+        """Display analysis of the retrieved data"""
+        print("\n" + "="*60)
+        print("📊 DATA ANALYSIS RESULTS")
+        print("="*60)
 
-        source_refs = rationale.get('source_refs', [])
-        if source_refs:
-            print("\n🔗 SOURCE POSTS:")
-            for i, ref in enumerate(source_refs, 1):
-                if ref:
-                    print(f"   {i}. {ref}")
+        summary = analysis.get('summary', {})
+        print(f"\n📈 SUMMARY:")
+        print(f"   Total posts: {summary.get('total_posts', 0)}")
+        print(f"   Platforms: {', '.join(summary.get('platforms_covered', []))}")
+        print(f"   Unique themes: {summary.get('unique_themes', 0)}")
+        print(f"   Most recent: {summary.get('most_recent_post_date', 'N/A')}")
 
-        if approach.get('fallback_used', False):
-            print("\n⚠️  FALLBACK MODE: No recent posts found, using general approach")
+        themes = analysis.get('theme_analysis', {})
+        print(f"\n🎯 THEMES DETECTED:")
+        print(f"   All themes: {', '.join(themes.get('detected_themes', []))}")
+
+        freq = themes.get('theme_frequency', {})
+        if freq:
+            print(f"   Most frequent:")
+            for theme, count in list(freq.items())[:3]:
+                print(f"      • {theme}: {count} posts")
+
+        engagement = analysis.get('engagement_analysis', {})
+        print(f"\n💡 ENGAGEMENT:")
+        total = engagement.get('total_engagement', {})
+        print(f"   Total likes: {total.get('likes', 0)}")
+        print(f"   Average likes/post: {engagement.get('average_likes_per_post', 0)}")
+
+        recent = analysis.get('recent_posts_preview', [])
+        if recent:
+            print(f"\n📝 RECENT POSTS:")
+            for i, post in enumerate(recent[:2], 1):
+                print(f"   {i}. [{post.get('date')}] {post.get('text_preview', '')}")
+                print(f"      Themes: {', '.join(post.get('themes', []))}")
 
         print("\n" + "="*60)
 
@@ -264,24 +293,18 @@ class ColdOpenCoachDemo:
             print("❌ No data fetched successfully")
             return
 
-        # Generate conversation approach
-        user_context = {
-            "your_name": your_name,
-            "shared_signals": "",
-            "event_context": "networking event"
-        }
+        # Display the raw retrieved data
+        self.display_retrieved_data(bundles)
 
-        preferences = {
-            "tone": "friendly",
-            "language": "en",
-            "freshness_days": 30
-        }
-
+        # Analyze the retrieved data
         try:
-            approach_data = await self.generate_approach(bundles, user_context, preferences)
-            self.display_results(approach_data)
+            analysis = self.analyze_retrieved_data(bundles)
+            self.display_analysis(analysis)
         except Exception as e:
-            print(f"❌ Error generating approach: {e}")
+            print(f"❌ Error analyzing data: {e}")
+
+        print(f"\n💡 This data can now be used by any LLM to generate conversation starters!")
+        print(f"📝 The MCP tools returned structured, normalized data ready for analysis.")
 
 
 async def main():
