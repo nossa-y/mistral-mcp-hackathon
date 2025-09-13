@@ -354,5 +354,11 @@ def get_linkedin_posts(profile_url: str, limit: int = 10) -> str:
 # Export the FastMCP instance for Lambda usage
 app = mcp
 
-if __name__ == "__main__":
+
+def main():
+    """Entry point for the CLI script"""
     mcp.run()
+
+
+if __name__ == "__main__":
+    main()
