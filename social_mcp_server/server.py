@@ -8,6 +8,10 @@ import os
 import re
 from datetime import datetime, timezone
 from typing import Dict, Any
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 from urllib.parse import urlparse
 
 from apify_client import ApifyClient
@@ -302,11 +306,14 @@ app = mcp
 
 def main():
     """Entry point for the CLI script"""
-    mcp.run()
+    if os.getenv("HTTP_MODE"):
+        mcp.run(transport="sse", port=int(os.getenv("PORT", 8080)))
+    else:
+        mcp.run()
 
 
 if __name__ == "__main__":
     if os.getenv("HTTP_MODE"):
-        mcp.run_http(port=int(os.getenv("PORT", 8080)))
+        mcp.run(transport="sse", port=int(os.getenv("PORT", 8080)))
     else:
         mcp.run()  # STDIO for local testing
