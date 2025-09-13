@@ -179,5 +179,8 @@ def get_recent_posts(handle: str, limit: int = 20) -> str:
 
         return f"Error: {error_type} - {error_msg}"
 
+# Export the FastMCP instance for Lambda usage
+app = mcp
+
 if __name__ == "__main__":
     mcp.run()

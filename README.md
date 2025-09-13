@@ -1,317 +1,275 @@
-# ColdOpen Coach - MCP Server Collection
+# ColdOpen Coach - Le Chat Integration
 
-🤖 **AI-powered cold outreach coaching using social media insights**
+At events, it's often awkward to approach someone you recognize from LinkedIn or X but don't know how to start the conversation. **ColdOpen Coach** solves this by providing MCP servers that fetch a person's latest public posts, which **Mistral's Le Chat** can then use to generate:
 
-Generate personalized conversation starters by analyzing public social media activity from Twitter/X and LinkedIn. Built as modular MCP servers for seamless integration with AI assistants like Claude Desktop and Mistral Le Chat.
+- **A short, natural opener** that echoes the theme of their most recent post (without sounding scripted)
+- **A light follow-up question** that keeps the conversation flowing
+- **A quick coaching note** on tone and delivery
 
-## ✨ What This Does
+**Le Chat handles the conversation coaching - our MCP servers just provide clean, structured social media data.**
 
-ColdOpen Coach helps you create better cold outreach messages by:
-- 🔍 **Analyzing recent social posts** from Twitter/X and LinkedIn
-- 🎯 **Finding conversation starters** based on interests and activities
-- 💬 **Generating personalized openers** in different tones (casual, professional, playful)
-- 🔒 **Respecting privacy** - only uses public posts, no contact scraping
+## Architecture
 
-Perfect for sales professionals, recruiters, and networkers who want to make genuine connections.
+ColdOpen Coach provides **2 focused MCP servers** that integrate seamlessly with Le Chat:
 
-## 🚀 Quick Start
+- `mcp_x` → tool: `x.get_recent_posts` - Fetches Twitter/X posts via Apify
+- `mcp_linkedin` → tool: `linkedin.get_recent_posts` - Fetches LinkedIn posts via Apify
 
-### Prerequisites
-- Python 3.11+ (tested with 3.11, 3.12, and 3.13)
-- An [Apify](https://apify.com/) account (free tier available)
-- Optional: LinkedIn account for LinkedIn data
+**Le Chat orchestrates everything else** - data analysis, conversation generation, and coaching advice.
 
-### 1️⃣ Install
+## Features
+
+- ✅ **Clean MCP Integration**: Purpose-built tools for Le Chat consumption
+- ✅ **Fresh Data**: Fetches posts from the last 30 days via Apify APIs
+- ✅ **No Caching**: Real-time data on every request
+- ✅ **Theme Detection**: Automatically categorizes posts (AI, hiring, fundraising, etc.)
+- ✅ **Normalized Output**: Platform-agnostic JSON structures
+- ✅ **Error Handling**: Clear messages for rate limits, private profiles, invalid inputs
+- ✅ **Le Chat Ready**: Structured data that Le Chat can consume directly
+
+## Quick Start
+
+### 1. Setup
 
 ```bash
-# Clone the project
-git clone https://github.com/nossa-y/mistral-mcp-hackathon.git
-cd mistral-mcp-hackathon/coldopen-coach
-
-# Install uv package manager (recommended)
-curl -LsSf https://astral.sh/uv/install.sh | sh
+# Clone and navigate to the project
+cd coldopen-coach
 
 # Install dependencies
-uv sync
-```
-
-<details>
-<summary>💡 Alternative: Using pip instead of uv</summary>
-
-```bash
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
+
+# Set up environment
+cp .env.example .env
+# Edit .env and add your APIFY_TOKEN
 ```
-</details>
 
-### 2️⃣ Get Your API Key
+### 2. Configure Apify
 
-1. Sign up at [apify.com](https://apify.com) (free tier includes 10,000 credits)
-2. Go to Settings → Integrations → API tokens
-3. Create a new token and copy it
+You'll need:
+- An [Apify](https://apify.com) account and API token
+- Access to Twitter/X and LinkedIn post scraping actors
 
-### 3️⃣ Configure
+Add to your `.env`:
+```bash
+APIFY_TOKEN=your_apify_token_here
+APIFY_TWITTER_ACTOR=apidojo/tweet-scraper
+APIFY_LINKEDIN_POSTS_ACTOR=your_linkedin_posts_actor
+```
 
-Create a `.env` file:
+### 3. Run MCP Servers
 
 ```bash
-# In the coldopen-coach directory
-echo "APIFY_TOKEN=your_apify_token_here" > .env
-echo "DEBUG=true" >> .env
+# X/Twitter server
+python mcp_servers/mcp_x/server.py
+
+# LinkedIn server
+python mcp_servers/mcp_linkedin/server.py
 ```
 
-**Optional LinkedIn Setup:** Add your LinkedIn cookie to access LinkedIn profiles:
-```bash
-echo "LINKEDIN_COOKIE=li_at=your_linkedin_cookie_here" >> .env
-```
-
-<details>
-<summary>🔍 How to find your LinkedIn cookie</summary>
-
-1. Log into LinkedIn in your browser
-2. Press F12 → Application tab → Cookies → linkedin.com
-3. Copy the value of the `li_at` cookie
-
-⚠️ **Note**: LinkedIn may restrict automated access. Use responsibly.
-</details>
-
-### 4️⃣ Test Your Setup
+### 4. Test Data Fetching
 
 ```bash
-# Test the core X/Twitter server
-uv run python -m mcp_servers.mcp_x.server
+# Test Twitter data fetch
+python demo/fetch_data.py --twitter-handle elonmusk
 
-# Test with a simple demo
-uv run python demo/fetch_data.py
+# Test LinkedIn data fetch
+python demo/fetch_data.py --linkedin-url "https://linkedin.com/in/reidhoffman"
 ```
 
-If you see MCP server output without errors, you're ready to go! 🎉
+## Le Chat Integration
 
-## 💬 Using with AI Assistants
+Once the MCP servers are running, Le Chat can use them directly:
 
-### Claude Desktop Configuration
+### Example Le Chat Workflow:
 
-Add this to your Claude Desktop MCP settings file:
+1. **User**: "Help me start a conversation with @elonmusk at this conference"
 
+2. **Le Chat**: *Calls `x.get_recent_posts` with handle "elonmusk"*
+
+3. **MCP Server**: Returns clean JSON with recent posts, themes, engagement data
+
+4. **Le Chat**: Analyzes the data and generates:
+   ```
+   **Opener**: "I'm curious about your thoughts on the current state of AI development tools -
+   the space seems to be evolving incredibly fast."
+
+   **Follow-up**: "What do you think developers need most that they're not getting yet?"
+
+   **Coaching**: "Lead with genuine curiosity. He's clearly passionate about dev tooling
+   and AI advancement, so focus on the intersection of those interests."
+   ```
+
+## MCP Tool Schemas
+
+### X Server: `x.get_recent_posts`
+
+**Input:**
 ```json
 {
-  "mcpServers": {
-    "coldopen-x": {
-      "command": "uv",
-      "args": ["run", "python", "-m", "mcp_servers.mcp_x.server"],
-      "cwd": "/path/to/mistral-mcp-hackathon/coldopen-coach"
-    },
-    "coldopen-coach": {
-      "command": "uv",
-      "args": ["run", "python", "-m", "mcp_servers.mcp_approach_coach.server"],
-      "cwd": "/path/to/mistral-mcp-hackathon/coldopen-coach"
-    }
-  }
+  "handle": "elonmusk",
+  "limit": 20
 }
 ```
 
-**Replace** `/path/to/` with your actual path to the project.
-
-<details>
-<summary>📁 Where to find your MCP settings file</summary>
-
-- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
-- **Linux**: `~/.config/claude/claude_desktop_config.json`
-
-</details>
-
-### Example Workflow
-
-1. **Fetch Data**: "Fetch recent posts from @elonmusk on Twitter"
-2. **Analyze**: "Analyze these posts for conversation starters"
-3. **Generate**: "Generate 3 cold outreach openers in professional tone"
-
-## 🛠️ Available Tools
-
-| **Server** | **Tool** | **What It Does** |
-|------------|----------|------------------|
-| **Twitter/X** | `fetch_recent_posts` | Get recent tweets from any public user |
-| | `search_posts` | Search tweets by keywords/hashtags |
-| **LinkedIn** | `get_person_profile` | Get public LinkedIn profile info |
-| | `get_recent_activity` | Fetch recent LinkedIn posts |
-| **Coach** | `analyze_social_context` | Find conversation topics from posts |
-| | `generate_openers` | Create personalized outreach messages |
-| | `suggest_themes` | Identify interests and themes |
-
-## 📋 Example Use Cases
-
-### Sales Professional
-```
-"Fetch recent posts from @prospect_twitter, analyze for business interests,
-and generate 3 professional openers for a SaaS pitch"
-```
-
-### Recruiter
-```
-"Get LinkedIn activity for John Doe at TechCorp, identify recent projects,
-and suggest casual conversation starters"
-```
-
-### Networker
-```
-"Find recent posts about 'AI' from @tech_leader, generate playful openers
-that reference their interests"
-```
-
-## 📚 Detailed Usage Examples
-
-### Working with Twitter/X Data
-
-```bash
-# In Claude Desktop or Le Chat, you can ask:
-"Fetch the last 15 posts from @elonmusk and summarize his recent interests"
-
-# Or use the tools directly:
-fetch_recent_posts(username="elonmusk", limit=15)
-```
-
-**Response format:**
+**Output:**
 ```json
 {
+  "person": {
+    "name": "@elonmusk",
+    "platform": "x",
+    "handle": "elonmusk",
+    "profile_url": "https://twitter.com/elonmusk"
+  },
   "posts": [
     {
-      "id": "1234567890",
-      "text": "AI will transform everything...",
-      "created_at": "2024-01-15T10:30:00Z",
-      "metrics": {"likes": 5420, "retweets": 1200}
+      "platform": "x",
+      "post_id": "1234567890",
+      "url": "https://twitter.com/elonmusk/status/1234567890",
+      "created_at_iso": "2024-01-15T10:30:00Z",
+      "text": "Just shipped a new AI agent feature...",
+      "hashtags": ["#AI", "#DevTools"],
+      "engagement": {"likes": 245, "retweets": 67},
+      "inferred_themes": ["ai_agents", "shipping_quality"]
     }
   ],
-  "user_info": {
-    "username": "elonmusk",
-    "followers": 150000000
+  "meta": {
+    "source": "mcp_x",
+    "fetched_at_iso": "2024-01-16T12:00:00Z",
+    "limit": 20,
+    "total_found": 2
   }
 }
 ```
 
-### LinkedIn Profile Analysis
+### LinkedIn Server: `linkedin.get_recent_posts`
 
-```bash
-# Ask Claude:
-"Get LinkedIn profile for John Smith at TechCorp and identify recent activity"
-
-# Direct tool usage:
-get_person_profile(linkedin_url="https://linkedin.com/in/johnsmith")
+**Input:**
+```json
+{
+  "profile_url": "https://linkedin.com/in/username",
+  "limit": 10
+}
 ```
 
-### Complete Workflow Example
+**Output:** Same structure as X server, but with `platform: "linkedin"`
 
-1. **Research Phase:**
-   ```
-   "Fetch recent posts from @prospect_handle on X and their LinkedIn activity"
-   ```
+## Data Structure
 
-2. **Analysis Phase:**
-   ```
-   "Based on this data, what are 3 conversation topics I could use for outreach?"
-   ```
+### Normalized Post
+```json
+{
+  "platform": "x" | "linkedin",
+  "post_id": "unique_identifier",
+  "url": "direct_link_to_post",
+  "created_at_iso": "2024-01-15T10:30:00Z",
+  "text": "Post content...",
+  "hashtags": ["#AI", "#DevTools"],
+  "mentions": ["@username"],
+  "engagement": {"likes": 245, "retweets": 67},
+  "inferred_themes": ["ai_agents", "shipping_quality"]
+}
+```
 
-3. **Generate Openers:**
-   ```
-   "Write 3 cold outreach messages: one casual, one professional, one creative"
-   ```
+### Detected Themes
 
-## 🔧 Development & Testing
+The system automatically detects these themes:
+- `ai_agents` - AI, LLM, ChatGPT, Claude, machine learning
+- `shipping_quality` - Deploy, launch, testing, bugs, builds
+- `product_experiments` - A/B tests, MVPs, user research, prototypes
+- `fundraising` - Funding, investors, Series A/B, VC, pitch
+- `hiring` - Recruiting, job openings, team building, engineers
+- `open_source` - OSS, GitHub, contributions, pull requests
+- `design_systems` - UI/UX, component libraries, Figma, wireframes
+- `sports` - Football, basketball, Olympics, games, championships
+- `crypto` - Bitcoin, blockchain, DeFi, NFTs, Web3
+- `career` - Job search, networking, growth, mentorship
 
-### Project Structure
+## Error Handling
+
+Clear error classification for Le Chat:
+
+- `NOT_FOUND` - No posts found for the profile
+- `RATE_LIMITED` - Apify API throttling (retry later)
+- `SCHEMA_MISMATCH` - Actor response format changed
+- `PRIVATE_PROFILE` - Profile is not public
+- `INVALID_INPUT` - Invalid handle or URL format
+- `API_ERROR` - General API or network error
+
+## Project Structure
 
 ```
 coldopen-coach/
-├── mcp_servers/         # MCP server implementations
-│   ├── mcp_x/          # Twitter/X via Apify
-│   └── mcp_linkedin/   # LinkedIn via Apify
-├── shared/             # Shared utilities
-│   ├── models.py       # Pydantic data models
-│   └── theme_inference.py # Theme analysis
-├── demo/               # Demo scripts
-├── pyproject.toml      # Modern Python config
-└── uv.lock            # Dependency lock
+├── requirements.txt           # Minimal dependencies (MCP, Apify, Pydantic)
+├── .env.example              # Environment template
+├── shared/
+│   ├── models.py            # Clean data models for Le Chat
+│   └── theme_inference.py   # Theme detection engine
+├── mcp_servers/             # 2 focused MCP servers
+│   ├── mcp_x/
+│   │   └── server.py        # X/Twitter MCP server
+│   └── mcp_linkedin/
+│       └── server.py        # LinkedIn MCP server
+├── demo/
+│   └── fetch_data.py        # Test data fetching
+└── README.md               # This file
 ```
 
-### Testing Your Setup
+## Le Chat Conversation Prompts
 
+Here are example prompts you can use with Le Chat once the servers are running:
+
+### Basic Usage
+```
+"Help me start a conversation with [person] at this networking event.
+Use the mcp_x server to get their recent tweets first."
+```
+
+### With Context
+```
+"I'm meeting [person] at a tech conference tomorrow. We both work in AI.
+Fetch their recent LinkedIn posts and suggest a natural conversation opener."
+```
+
+### Specific Scenario
+```
+"I want to approach [person] who I know from Twitter. Get their recent posts
+and help me find common ground for a respectful introduction at this startup event."
+```
+
+## Development
+
+### Adding New Platforms
+
+1. Create new MCP server in `mcp_servers/mcp_[platform]/`
+2. Implement `[platform].get_recent_posts` tool
+3. Use the same Bundle/Post/Person data structure
+4. Add platform to Platform enum in shared/models.py
+
+### Extending Theme Detection
+
+Edit `shared/theme_inference.py` and add keywords to `THEME_KEYWORDS`.
+
+### Custom Apify Actors
+
+Override default actors in `.env`:
 ```bash
-# Run the demo
-uv run python demo/fetch_data.py
-
-# Test server directly
-echo '{"method": "tools/list", "params": {}}' | uv run python -m mcp_servers.mcp_x.server
-
-# Test dependencies
-uv run python test_basic.py
+APIFY_TWITTER_ACTOR=your_custom_actor
+APIFY_LINKEDIN_POSTS_ACTOR=your_linkedin_actor
 ```
 
-## 🤝 Contributing & Support
+## Why This Architecture?
 
-### Contributing
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Make your changes and test them: `uv run python test_basic.py`
-4. Commit your changes: `git commit -m 'Add amazing feature'`
-5. Push and create a Pull Request
+**🎯 Focused MCP Servers**: Each server does one thing well - fetch and normalize social data
+**🧠 Le Chat Orchestration**: Advanced conversation coaching handled by Mistral's AI
+**🔄 Clean Integration**: Standard MCP protocol, no custom APIs
+**📊 Structured Output**: JSON that AI can easily consume and reason about
+**⚡ Real-time**: No caching, fresh data every time
+**🛡️ Error Resilient**: Clear error states for robust AI workflows
 
-### Support & Issues
-- 🐛 **Bug reports**: Create an issue on GitHub
-- 💡 **Feature requests**: Open a discussion
-- 📖 **Documentation**: Check the inline code comments
+## License
 
-## 🔒 Privacy & Ethics
-
-- ✅ **Public data only** - No private information scraping
-- ✅ **No contact harvesting** - Focuses on conversation starters, not emails/phones
-- ✅ **Transparent costs** - Apify usage is clearly tracked
-- ✅ **Legitimate use** - Designed for professional networking and relationship building
-
-⚠️ **LinkedIn Note**: Uses Apify actors for LinkedIn data. Ensure compliance with LinkedIn's Terms of Service.
-
-## 🚨 Troubleshooting
-
-### Common Issues
-
-| **Problem** | **Solution** |
-|------------|-------------|
-| `ModuleNotFoundError` | Run `uv sync` or `pip install -r requirements.txt` |
-| LinkedIn "Access Denied" | Update your `li_at` cookie in `.env` file |
-| Apify "Insufficient credits" | Check your [Apify usage](https://console.apify.com/billing) and upgrade if needed |
-| MCP server won't start | Verify `.env` file exists and contains `APIFY_TOKEN=your_token` |
-| "No such file or directory" | Check your working directory is `coldopen-coach/` |
-
-### Quick Diagnostics
-
-```bash
-# Test your setup
-uv run python -c "import apify_client; print('✅ Dependencies OK')"
-
-# Check environment
-uv run python -c "import os; print('✅ APIFY_TOKEN found' if os.getenv('APIFY_TOKEN') else '❌ Missing APIFY_TOKEN')"
-
-# Test MCP server
-echo '{"method": "tools/list", "params": {}}' | uv run python -m mcp_servers.mcp_x.server
-```
-
-### Still Having Issues?
-
-1. **Check the logs** - Each server shows detailed error messages
-2. **Test with demo** - Run `uv run python demo/fetch_data.py`
-3. **Verify API keys** - Ensure your Apify token is valid and has credits
+MIT License - see LICENSE file for details.
 
 ---
 
-## 🎯 What's Next?
-
-After setup, you can:
-- **Start simple**: Ask Claude to "fetch recent posts from @anyone"
-- **Go deeper**: "Analyze this person's interests and suggest conversation topics"
-- **Get creative**: "Write personalized outreach messages based on their posts"
-
-**Happy networking!** 🚀
-
----
-
-*Built for the Mistral MCP Hackathon • Powered by Apify & FastMCP*
+**ColdOpen Coach** - Clean social data for Le Chat conversation coaching. 🤝

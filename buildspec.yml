@@ -35,8 +35,23 @@ phases:
         if [ -n "$CODEBUILD_SRC_DIR_HANDLERS" ]; then
           cp -r $CODEBUILD_SRC_DIR_HANDLERS $SRC_DIR/alpic
         fi
+      # Ensure our Dockerfile is available where AWS expects it
+      - |
+        if [ -n "$CODEBUILD_SRC_DIR_DOCKERFILES" ]; then
+          echo "Using AWS-provided Dockerfile location: $CODEBUILD_SRC_DIR_DOCKERFILES"
+          # Copy our Dockerfile to the expected location if it doesn't exist
+          if [ ! -f "$CODEBUILD_SRC_DIR_DOCKERFILES/$RUNTIME" ]; then
+            echo "Copying our Dockerfile to AWS expected location"
+            mkdir -p "$CODEBUILD_SRC_DIR_DOCKERFILES"
+            cp "$SRC_DIR/dockerfiles/$RUNTIME" "$CODEBUILD_SRC_DIR_DOCKERFILES/$RUNTIME"
+          fi
+        else
+          echo "No AWS Dockerfile directory specified, using local dockerfiles"
+          export CODEBUILD_SRC_DIR_DOCKERFILES="$SRC_DIR/dockerfiles"
+        fi
       # Detect MCP transport type
       - |
+        cd $SRC_DIR
         export TRANSPORT_TYPE=$( (grep -r "import.*from ['\"]@modelcontextprotocol/sdk/server/\(stdio\|sse\|streamableHttp\)[.'\"]" --include="*.ts" . | grep -o -E "(stdio|sse|streamableHttp)" | head -1 | tr '[:upper:]' '[:lower:]';grep -r "mcp.run(.*transport=['\"]\(stdio\|sse\|streamable-http\|http\)['\"]" --include="*.py" . | grep -o -E "(stdio|sse|streamable-http|http)" | head -1;grep -r "mcp.run(" --include="*.py" . | head -1 | sed 's/.*/stdio/') | head -1)
       - |
         if [ -z "$TRANSPORT_TYPE" ]; then
@@ -44,6 +59,37 @@ phases:
         else
           echo "MCP transport: $TRANSPORT_TYPE"
         fi
+      # Verify required files exist before building
+      - |
+        echo "Verifying build dependencies in $SRC_DIR"
+        if [ ! -f "$SRC_DIR/uv.lock" ]; then
+          echo "ERROR: uv.lock not found at $SRC_DIR/uv.lock"
+          exit 1
+        fi
+        if [ ! -f "$SRC_DIR/pyproject.toml" ]; then
+          echo "ERROR: pyproject.toml not found at $SRC_DIR/pyproject.toml"
+          exit 1
+        fi
+        if [ ! -f "$CODEBUILD_SRC_DIR_DOCKERFILES/$RUNTIME" ]; then
+          echo "ERROR: Dockerfile not found at $CODEBUILD_SRC_DIR_DOCKERFILES/$RUNTIME"
+          exit 1
+        fi
+        if [ ! -d "$SRC_DIR/mcp_servers" ]; then
+          echo "ERROR: mcp_servers directory not found at $SRC_DIR/mcp_servers"
+          exit 1
+        fi
+        if [ ! -d "$SRC_DIR/shared" ]; then
+          echo "ERROR: shared directory not found at $SRC_DIR/shared"
+          exit 1
+        fi
+        if [ ! -f "$SRC_DIR/lambda_handler.py" ]; then
+          echo "ERROR: lambda_handler.py not found at $SRC_DIR/lambda_handler.py"
+          exit 1
+        fi
+        echo "All required files verified"
+        echo "Build context: $SRC_DIR"
+        echo "Dockerfile: $CODEBUILD_SRC_DIR_DOCKERFILES/$RUNTIME"
+        ls -la "$SRC_DIR/" | head -10
 
   build:
     commands:

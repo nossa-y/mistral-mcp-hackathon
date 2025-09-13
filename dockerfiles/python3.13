@@ -10,12 +10,15 @@ FROM public.ecr.aws/lambda/python:3.13 as builder
 # Set working directory to the Lambda task root
 WORKDIR ${LAMBDA_TASK_ROOT}
 
+# Copy Python configuration files for dependency installation
+# These paths are relative to the build context (repository root)
+COPY uv.lock ./uv.lock
+COPY pyproject.toml ./pyproject.toml
+
 # Install dependencies to Lambda task root using UV
-# Mount UV from the uv stage and use cache for faster builds
+# Use UV from the uv stage and cache for faster builds
 RUN --mount=from=uv,source=/uv,target=/bin/uv \
     --mount=type=cache,target=/root/.cache/uv \
-    --mount=type=bind,source=coldopen-coach/uv.lock,target=uv.lock \
-    --mount=type=bind,source=coldopen-coach/pyproject.toml,target=pyproject.toml \
     uv export --frozen --no-emit-workspace --no-dev --no-editable -o requirements.txt && \
     uv pip install -r requirements.txt --target "${LAMBDA_TASK_ROOT}"
 
@@ -26,9 +29,10 @@ FROM public.ecr.aws/lambda/python:3.13 as runner
 COPY --from=builder ${LAMBDA_TASK_ROOT} ${LAMBDA_TASK_ROOT}
 
 # Copy application code
-COPY coldopen-coach/mcp_servers/ ${LAMBDA_TASK_ROOT}/mcp_servers/
-COPY coldopen-coach/shared/ ${LAMBDA_TASK_ROOT}/shared/
-COPY coldopen-coach/lambda_handler.py ${LAMBDA_TASK_ROOT}/
+# These paths are relative to the build context (repository root)
+COPY mcp_servers/ ${LAMBDA_TASK_ROOT}/mcp_servers/
+COPY shared/ ${LAMBDA_TASK_ROOT}/shared/
+COPY lambda_handler.py ${LAMBDA_TASK_ROOT}/
 
 # Set the Lambda handler
 # This will need to be customized based on which MCP server you're deploying
